@@ -1,6 +1,19 @@
 # LongShot (AlertOn)
 
-Private monorepo: CLI agents, Express API, React admin UI, PostgreSQL.
+Self-hosted **alert bridge** for ops teams: thin Node CLI agents on monitored hosts, Express API + React admin UI + PostgreSQL on a small control plane.
+
+## What this is (and is not)
+
+**Built for constrained / legacy environments** — Windows or Linux hosts that cannot (or should not) run a full observability stack: limited RAM/CPU, no Docker on the agent, flaky networks, or “just page us when X breaks.”
+
+| Layer | Resource profile |
+|-------|------------------|
+| **Agent host** | Node.js 18+ only. One long-lived `node cli.js --agent` process; heartbeats on the order of minutes; alert POSTs when something fails. No local metrics DB, log indexer, or message broker. |
+| **Control plane** | Three Compose services (Postgres + API + UI). Far lighter than ELK / Kafka / Prometheus+Grafana+Loki, but still a small server — not a single static binary. |
+
+**Not a competitor to** Prometheus, Grafana, Loki/ELK, Kafka-based alerting, or full APM. Those collect metrics, logs, and traces at scale. LongShot does **authenticated alert ingest, heartbeats, retention, and an in-app notification UI** — a push-based ops signal path when the modern stack is overkill or unavailable on the box.
+
+Use it **alongside** a modern stack if you want (agents on legacy islands; Grafana elsewhere), or **standalone** for small/air-gapped/legacy fleets.
 
 ## Prerequisites
 

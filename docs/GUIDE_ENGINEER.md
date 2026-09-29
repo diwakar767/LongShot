@@ -1,5 +1,7 @@
 # Engineer / CLI agent guide
 
+Designed for **resource-constrained or legacy hosts**: the agent is a single Node process (alert POST + periodic heartbeat + quiet resolve flush). It is not a metrics exporter and does not ship logs.
+
 ## Prerequisites (agent host)
 
 - **Node.js 18+** only (Docker **not** required on the agent)

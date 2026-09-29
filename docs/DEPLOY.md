@@ -1,5 +1,11 @@
 # Deploy guide
 
+## Fit for constrained environments
+
+- **Agent hosts** are the constrained side: install Node 18+, drop in `alerton-cli/`, run as a service. No Docker, no local DB, no continuous scrape load.
+- **Admin host** needs enough headroom for Postgres + API + UI (Compose). Prefer not exposing Postgres; put TLS in front for anything beyond a lab.
+- This stack is intentionally **not** ELK/Kafka/Prometheus — see the README positioning section.
+
 ## Prerequisites
 
 - Docker Engine + Compose v2 (or Docker Desktop)

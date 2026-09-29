@@ -2,8 +2,10 @@
 
 ## Context
 
-LongShot implements AlertOn:
+LongShot implements AlertOn as a **lightweight alert bridge**, not a metrics/log platform.
 
+- **Target:** constrained or legacy agent hosts (Node-only CLI; optional Windows NSSM / Linux systemd).
+- **Non-goals:** time-series metrics, log indexing, distributed tracing, Kafka/stream pipelines, or replacing Grafana/Prometheus/ELK.
 - **Engineers** run Node CLI agents (per-server API key).
 - **Admins** manage inventory and view everything in the web UI.
 - **Users** see scoped alerts and in-app notifications.
@@ -54,4 +56,4 @@ docs/              Deploy + role guides
 CLI heartbeat every `heartbeat_interval_seconds` (default 900). Server **Down** after 2× interval without a beat.
 
 ## Explicit non-goals (near term)
-Microservices, Kubernetes, paid SMS/email/FCM as primary notify, mandatory per-host mTLS.
+Metrics/log/trace platforms (Prometheus, Grafana, Loki/ELK, Kafka pipelines, APM), microservices, Kubernetes, paid SMS/email/FCM as primary notify, mandatory per-host mTLS.
