@@ -28,10 +28,10 @@ Source: product PDF vision + current codebase (Phase 1 baseline).
 | US-A4 | As an admin, I can search an audit log of actions | Audit page + `GET /audit` | **Done** |
 | US-A5 | As an admin, I can issue a temporary password via password-reset fulfill | Requests page + fulfill returns temp password; user must change on login | **Done** (Secure Core) |
 | US-A6 | As an admin, I can lock/unlock accounts | UI placeholders; no backend fields | **Planned** |
-| US-A7 | As an admin, I can assign users to groups and set view permissions | Membership/permission APIs exist; UI incomplete; alert scoping deferred | **Partial** |
-| US-A8 | As an admin/user, I can configure which severities create **in-app** notifications | Settings prefs + notify pipeline | **Planned** (InAppNotifications) |
-| US-A9 | As an admin, I can list/fulfill/reject password-reset requests | Requests page + admin APIs | **Done** (Secure Core; access-subscription requests still Planned) |
-| US-A10 | As an admin, I can approve or reject group/server access requests | Separate from password reset | **Planned** (PermissionsAccess) |
+| US-A7 | As an admin, I can assign users to groups and set view permissions | Users Groups dialog + membership APIs; alert scoping wired | **Done** |
+| US-A8 | As an admin/user, I can configure which severities create **in-app** notifications | Settings local prefs; notify pipeline next | **Partial** |
+| US-A9 | As an admin, I can list/fulfill/reject password-reset requests | Requests page + admin APIs | **Done** (Secure Core) |
+| US-A10 | As an admin, I can approve or reject group/server access requests | `/access` UI + approve/reject APIs | **Done** |
 
 ---
 
@@ -41,11 +41,11 @@ Source: product PDF vision + current codebase (Phase 1 baseline).
 |----|-------|------------|--------|
 | US-U1 | As a user, I can request a password reset and change a temporary password | Public request → admin temp password → change-password → JWT | **Done** (Secure Core) |
 | US-U1b | As a user, I can enroll and use TOTP for login | `/totp/setup`, `/totp/enable`, `/login/totp` | **Done** (Secure Core) |
-| US-U2 | As a user, I see only alerts for my approved groups/permissions | Wire `UserPermission` into `GET /alerts` | **Planned** (PermissionsAccess) |
+| US-U2 | As a user, I see only alerts for my approved groups/permissions | Scoped `GET /alerts` via membership + `UserPermission` | **Done** |
 | US-U3 | As a user, I can manage which severities create in-app notifications | Settings stub → InAppNotifications sprint | **Planned** |
 | US-U4 | As a user, I see new alerts in an **in-app** notification inbox (bell/unread) | Free path; same API for optional mobile later | **Planned** |
-| US-U4b | As a user, I use a mobile-friendly, animated web UI | UXMobileFirst sprint | **Planned** |
-| US-U5 | As a user, I can request group subscriptions pending admin approval | Not implemented | **Planned** |
+| US-U4b | As a user, I use a mobile-friendly, animated web UI | UXMobileFirst sprint | **Done** |
+| US-U5 | As a user, I can request group/server access pending admin approval | `/access` request flow | **Done** |
 | US-U6 | As a user, I can use a mobile app offline with sync | Optional mobile client | **Planned** |
 
 ---

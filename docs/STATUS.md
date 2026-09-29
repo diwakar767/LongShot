@@ -1,7 +1,7 @@
 ﻿# Project Status
 
 **Last updated:** 2026-09-29  
-**Active sprint next:** Permissions + access requests  
+**Active sprint next:** In-app notifications  
 **Remote:** https://github.com/diwakar767/LongShot.git  
 **Canonical plan:** [ROADMAP.md](./ROADMAP.md) · [SPRINTS.md](./SPRINTS.md)
 
@@ -17,27 +17,21 @@ Lab admin: `admin` / `admin123`
 
 ## Completed
 
-- Phase 1 (Docker, env, API-key ingest, docs, DB migrate)  
-- Secure Core (reset requests, temp password, TOTP, logout-on-401-only)  
-- E2E **31/31 PASS**  
-- Backend Hardening (modules, Umzug migrations, tests, logger)  
-- **UX Mobile-first** — responsive shell/drawer, dialogs+snackbars (no prompt/confirm/alert), page/list motion + critical severity pulse, skeletons/empty states, teal/slate theme (DM Sans), Settings trimmed to in-app severity prefs
+- Phase 1 · Secure Core · Backend Hardening · UX Mobile-first  
+- **Permissions + access requests** — scoped `GET /alerts` (admin=all; else group membership + `UserPermission`); `AccessRequest` API/UI (`/access`); Users group assign/remove  
 
 ## Locked product decisions (see ROADMAP)
 
-- Notifications = **in-app** (free); same model for optional mobile later  
-- UI = **mobile-first**, dynamic, with purposeful animations  
+- Notifications = **in-app** (free)  
+- UI = mobile-first + purposeful motion  
 - No email/SMS for auth; no paid push required for MVP  
 
 ## Sequence remaining
 
-1. **Permissions + access requests**  
-2. **In-app notifications**  
-3. **Mobile client** (optional)  
+1. **In-app notifications**  
+2. **Mobile client** (optional)  
 
 ## Still not done
 
-- Permission-scoped alerts  
-- Access-request workflow (group/server)  
 - In-app notification center (bell)  
 - Optional mobile client  

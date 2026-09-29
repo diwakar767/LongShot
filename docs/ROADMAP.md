@@ -49,15 +49,14 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 | E2E suite (31/31) | Done |
 | Maintainable backend (modules + migrations) | Done |
 | Mobile-first layout + animations | Done |
+| Permission-scoped alerts + access requests | Done |
 
 ### Not done yet
 
 | Capability | State |
 |------------|--------|
 | In-app notification center | Planned (Notify sprint) |
-| Permission-scoped alerts | Broken/unwired |
-| Group/server access requests | Not built |
-| Settings severity prefs | Stub (will drive in-app notify prefs) |
+| Settings severity prefs | Local prefs done; notify pipeline Planned |
 | Optional mobile client | Later |
 
 ---
@@ -68,8 +67,8 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 SecureCore (done)
   → BackendHardening (done)
   → UXMobileFirst (done)
-  → Permissions+AccessRequests — next
-  → InAppNotifications (MVP notify — free)
+  → Permissions+AccessRequests (done)
+  → InAppNotifications (MVP notify — free) — next
   → MobileClient (optional; same in-app model)
 ```
 
@@ -91,12 +90,12 @@ Auth recovery without email/SMS; TOTP; session fixes.
 - Dead component/dep cleanup  
 - Settings stub: keep only what feeds later in-app prefs, or remove noise  
 
-### 4) Permissions + access requests — Next
+### 4) Permissions + access requests — Done
 - Wire `UserPermission` / memberships into alert listing  
 - Access requests (group/server) separate from password-reset requests  
 - Users UI: real group assignment  
 
-### 5) In-app notifications (free MVP notify)
+### 5) In-app notifications (free MVP notify) — Next
 - On alert ingest (and key admin events), create **Notification** rows for eligible users  
 - API: list / mark-read / unread count  
 - UI: notification bell + panel (mobile-friendly)  

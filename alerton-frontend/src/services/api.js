@@ -210,4 +210,39 @@ export const checkAdmin = async () => {
   return response.data;
 };
 
+export const getUserGroups = async (userId) => {
+  const response = await api.get(`/users/${userId}/groups`);
+  return response.data;
+};
+
+export const assignUserGroup = async (userId, groupId) => {
+  const response = await api.post(`/users/${userId}/groups/${groupId}`);
+  return response.data;
+};
+
+export const removeUserGroup = async (userId, groupId) => {
+  const response = await api.delete(`/users/${userId}/groups/${groupId}`);
+  return response.data;
+};
+
+export const getAccessRequests = async () => {
+  const response = await api.get('/access-requests');
+  return response.data;
+};
+
+export const createAccessRequest = async (payload) => {
+  const response = await api.post('/access-requests', payload);
+  return response.data;
+};
+
+export const approveAccessRequest = async (id, notes) => {
+  const response = await api.post(`/access-requests/${id}/approve`, { notes });
+  return response.data;
+};
+
+export const rejectAccessRequest = async (id, notes) => {
+  const response = await api.post(`/access-requests/${id}/reject`, { notes });
+  return response.data;
+};
+
 export default api;

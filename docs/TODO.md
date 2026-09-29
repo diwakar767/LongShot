@@ -15,9 +15,9 @@ Priorities: P0 blocker · P1 next · P2 later. Tags map to [SPRINTS.md](./SPRINT
 | T-032 | P1 | UXMobileFirst | Animations (nav, lists, severity emphasis) | Done |
 | T-033 | P1 | UXMobileFirst | Dynamic UX (skeletons, empty states) | Done |
 | T-034 | P2 | UXMobileFirst | Theme cleanup + dead code/deps | Done |
-| T-050 | P1 | PermissionsAccess | Wire permission-scoped alerts | Todo |
-| T-051 | P1 | PermissionsAccess | Group/server access request API + UI | Todo |
-| T-052 | P2 | PermissionsAccess | Users UI: real group assignment | Todo |
+| T-050 | P1 | PermissionsAccess | Wire permission-scoped alerts | Done |
+| T-051 | P1 | PermissionsAccess | Group/server access request API + UI | Done |
+| T-052 | P2 | PermissionsAccess | Users UI: real group assignment | Done |
 | T-040 | P1 | InAppNotifications | Notification model + list/unread/mark-read APIs | Todo |
 | T-041 | P1 | InAppNotifications | Create notifications on alert ingest | Todo |
 | T-042 | P1 | InAppNotifications | Bell + panel UI (mobile-first) | Todo |

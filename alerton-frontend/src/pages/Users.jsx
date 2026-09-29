@@ -9,11 +9,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { getUsers, createUser, updateUser, deleteUser, checkAdmin } from '../services/api';
+import GroupIcon from '@mui/icons-material/Group';
+import {
+  getUsers, createUser, updateUser, deleteUser, checkAdmin,
+  getGroups, assignUserGroup, removeUserGroup
+} from '../services/api';
 import { useFeedback } from '../context/FeedbackContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
@@ -40,6 +42,9 @@ const Users = () => {
   const [newUser, setNewUser] = useState(emptyNewUser);
   const [editUser, setEditUser] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [groupsDialogUser, setGroupsDialogUser] = useState(null);
+  const [allGroups, setAllGroups] = useState([]);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
@@ -55,7 +60,7 @@ const Users = () => {
         is_admin: user.is_admin,
         tempPassword: false,
         locked: false,
-        groups: []
+        groups: user.groups || []
       }));
       setUsersData(formattedUsers);
       setFilteredUsers(formattedUsers);
@@ -69,6 +74,7 @@ const Users = () => {
   useEffect(() => {
     checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     fetchUsers();
+    getGroups().then(setAllGroups).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -200,6 +206,51 @@ const Users = () => {
     }
   };
 
+  const handleAssignGroup = async () => {
+    if (!groupsDialogUser || !selectedGroupId) {
+      notifyError('Select a group');
+      return;
+    }
+    setSaving(true);
+    try {
+      await assignUserGroup(groupsDialogUser.id, selectedGroupId);
+      notifySuccess('Group assigned');
+      setSelectedGroupId('');
+      await fetchUsers();
+      const refreshed = (await getUsers()).find((u) => u.user_id === groupsDialogUser.id);
+      if (refreshed) {
+        setGroupsDialogUser({
+          id: refreshed.user_id,
+          username: refreshed.username,
+          groups: refreshed.groups || []
+        });
+      }
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to assign group');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveGroup = async (groupId) => {
+    if (!groupsDialogUser) return;
+    setSaving(true);
+    try {
+      await removeUserGroup(groupsDialogUser.id, groupId);
+      notifySuccess('Group removed');
+      await fetchUsers();
+      setGroupsDialogUser((prev) =>
+        prev
+          ? { ...prev, groups: (prev.groups || []).filter((g) => g.group_id !== groupId) }
+          : prev
+      );
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to remove group');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(newUser.password);
     notifySuccess('Password copied');
@@ -217,6 +268,17 @@ const Users = () => {
         <Button
           size="small"
           variant="outlined"
+          startIcon={<GroupIcon />}
+          onClick={() => {
+            setGroupsDialogUser({ id: user.id, username: user.username, groups: user.groups || [] });
+            setSelectedGroupId('');
+          }}
+        >
+          Groups
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
           color="error"
           startIcon={<DeleteIcon />}
           onClick={() => setDeleteTarget(user)}
@@ -224,6 +286,17 @@ const Users = () => {
           Delete
         </Button>
       </Stack>
+    );
+
+  const groupChips = (user) =>
+    (user.groups || []).length ? (
+      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+        {user.groups.map((g) => (
+          <Chip key={g.group_id} size="small" label={g.group_name} />
+        ))}
+      </Stack>
+    ) : (
+      <Typography variant="body2" color="text.secondary">—</Typography>
     );
 
   return (
@@ -371,6 +444,68 @@ const Users = () => {
         onConfirm={handleDelete}
       />
 
+      <Dialog
+        open={!!groupsDialogUser}
+        onClose={() => !saving && setGroupsDialogUser(null)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle sx={{ fontWeight: 600 }}>
+          Groups — {groupsDialogUser?.username}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Membership grants visibility to alerts for that group.
+            </Typography>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+              {(groupsDialogUser?.groups || []).length === 0 && (
+                <Typography variant="body2" color="text.secondary">No groups yet</Typography>
+              )}
+              {(groupsDialogUser?.groups || []).map((g) => (
+                <Chip
+                  key={g.group_id}
+                  label={g.group_name}
+                  onDelete={isAdmin ? () => handleRemoveGroup(g.group_id) : undefined}
+                  disabled={saving}
+                />
+              ))}
+            </Stack>
+            {isAdmin && (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                <FormControl fullWidth size="small">
+                  <Select
+                    displayEmpty
+                    value={selectedGroupId}
+                    onChange={(e) => setSelectedGroupId(e.target.value)}
+                  >
+                    <MenuItem value="">
+                      <em>Select group</em>
+                    </MenuItem>
+                    {allGroups
+                      .filter(
+                        (g) =>
+                          !(groupsDialogUser?.groups || []).some((ug) => ug.group_id === g.group_id)
+                      )
+                      .map((g) => (
+                        <MenuItem key={g.group_id} value={g.group_id}>
+                          {g.group_name}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <Button variant="contained" onClick={handleAssignGroup} disabled={saving || !selectedGroupId}>
+                  Add
+                </Button>
+              </Stack>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setGroupsDialogUser(null)} disabled={saving}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
       {loading ? (
         <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} height={56} />)}</Stack>
       ) : filteredUsers.length === 0 ? (
@@ -383,25 +518,13 @@ const Users = () => {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                 {user.email}
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1.5 }}>
-                <Chip
-                  label={user.is_admin ? 'Admin' : 'Regular'}
-                  size="small"
-                  color={user.is_admin ? 'primary' : 'default'}
-                />
-                <Chip
-                  label={user.tempPassword ? 'Temp password' : 'Password set'}
-                  size="small"
-                  color={user.tempPassword ? 'warning' : 'success'}
-                  variant="outlined"
-                />
-                <Chip
-                  icon={user.locked ? <LockIcon /> : <LockOpenIcon />}
-                  label={user.locked ? 'Locked' : 'Unlocked'}
-                  size="small"
-                  variant="outlined"
-                />
-              </Stack>
+              <Box sx={{ mb: 1 }}>{groupChips(user)}</Box>
+              <Chip
+                size="small"
+                label={user.is_admin ? 'Admin' : 'User'}
+                color={user.is_admin ? 'primary' : 'default'}
+                sx={{ mb: 1.5 }}
+              />
               {actions(user)}
             </Paper>
           ))}
@@ -415,8 +538,6 @@ const Users = () => {
                   <TableCell>Username</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Admin</TableCell>
-                  <TableCell>Temp password</TableCell>
-                  <TableCell>Locked</TableCell>
                   <TableCell>Groups</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -430,42 +551,10 @@ const Users = () => {
                       <Chip
                         label={user.is_admin ? 'Yes' : 'No'}
                         size="small"
-                        sx={{
-                          backgroundColor: user.is_admin ? 'primary.light' : 'default',
-                          color: user.is_admin ? 'primary.dark' : 'text.secondary',
-                          fontWeight: 500
-                        }}
+                        color={user.is_admin ? 'primary' : 'default'}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={user.tempPassword ? 'Yes' : 'No'}
-                        size="small"
-                        sx={{
-                          backgroundColor: user.tempPassword ? 'warning.light' : 'success.light',
-                          color: user.tempPassword ? 'warning.dark' : 'success.dark',
-                          fontWeight: 500
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        {user.locked ? <LockIcon color="error" /> : <LockOpenIcon color="success" />}
-                        <Typography sx={{ ml: 1 }}>{user.locked ? 'Yes' : 'No'}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {user.groups.map((group, index) => (
-                          <Chip
-                            key={index}
-                            label={group}
-                            size="small"
-                            sx={{ backgroundColor: 'primary.light', color: 'primary.main', fontWeight: 500 }}
-                          />
-                        ))}
-                      </Box>
-                    </TableCell>
+                    <TableCell>{groupChips(user)}</TableCell>
                     <TableCell>{actions(user)}</TableCell>
                   </TableRow>
                 ))}

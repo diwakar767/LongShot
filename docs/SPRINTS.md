@@ -6,8 +6,8 @@ Canonical decisions: **[ROADMAP.md](./ROADMAP.md)**.
 SecureCore (done)
   → BackendHardening          (done)
   → UXMobileFirst             (done)
-  → PermissionsAccess         (next — scoped alerts + access requests)
-  → InAppNotifications        (free notify MVP)
+  → PermissionsAccess         (done)
+  → InAppNotifications        (next — free notify MVP)
   → MobileClient              (optional; same in-app model)
 ```
 
@@ -40,15 +40,13 @@ SecureCore (done)
 - Skeletons + empty states; Settings = local in-app severity prefs only  
 - Theme: teal/slate + DM Sans (no purple-glow AI look); removed unused AlertTable/StatCard  
 
-## Sprint Permissions + Access Requests — Next
+## Sprint Permissions + Access Requests — Done
 
-- Wire permission/membership filtering on alerts  
-- Group/server **access requests** (separate from password-reset Requests)  
+- Wire permission/membership filtering on alerts (admins see all)  
+- Group/server **access requests** API + `/access` UI (separate from password-reset Requests)  
 - Admin approve/reject; Users UI group assignment  
 
----
-
-## Sprint In-App Notifications (free)
+## Sprint In-App Notifications (free) — Next
 
 **Goal:** Users learn about new alerts without email/SMS/paid push.
 

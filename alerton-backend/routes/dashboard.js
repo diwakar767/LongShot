@@ -3,14 +3,16 @@ const { Alert } = require('../models/alert');
 const { Server } = require('../models/server');
 const { User } = require('../models/user');
 const { authenticateToken } = require('../middleware/auth');
+const { buildAlertScopeWhere } = require('../services/alertScope');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 router.get('/dashboard/summary', authenticateToken, async (req, res) => {
   try {
+    const scopeWhere = await buildAlertScopeWhere(req.user);
     const [alertCount, serverCount, userCount] = await Promise.all([
-      Alert.count(),
+      Alert.count({ where: scopeWhere || undefined }),
       Server.count({ where: { is_active: true } }),
       User.count({ where: { is_active: true } })
     ]);

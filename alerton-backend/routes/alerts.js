@@ -11,19 +11,23 @@ const {
   getGroupIdByName,
   getCountryIdByName
 } = require('../services/resolveNames');
+const { buildAlertScopeWhere } = require('../services/alertScope');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 router.get('/alerts', authenticateToken, async (req, res) => {
   try {
+    const scopeWhere = await buildAlertScopeWhere(req.user);
     const alerts = await Alert.findAll({
+      where: scopeWhere || undefined,
       include: [
         { model: Server, attributes: ['server_name', 'ip_address'] },
         { model: UserGroup, attributes: ['group_name'] },
         { model: Application, attributes: ['app_name'] },
         { model: Country, attributes: ['country_name'] }
-      ]
+      ],
+      order: [['updatedAt', 'DESC']]
     });
     const formattedAlerts = alerts.map(alert => ({
       id: alert.alert_id,

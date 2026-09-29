@@ -8,6 +8,7 @@ import Dashboard from '../pages/Dashboard';
 import Alerts from '../pages/Alerts';
 import Servers from '../pages/Servers';
 import Requests from '../pages/Requests';
+import AccessRequests from '../pages/AccessRequests';
 import Groups from '../pages/Groups';
 import Users from '../pages/Users';
 import Audit from '../pages/Audit';
@@ -43,6 +44,7 @@ export default function AppShell() {
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/servers" element={<Servers />} />
               <Route path="/requests" element={<Requests />} />
+              <Route path="/access" element={<AccessRequests />} />
               <Route path="/groups" element={<Groups />} />
               <Route path="/users" element={<Users />} />
               <Route path="/audit" element={<Audit />} />
