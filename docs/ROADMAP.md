@@ -48,12 +48,12 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 | Email OTP | Retired (410) |
 | E2E suite (31/31) | Done |
 | Maintainable backend (modules + migrations) | Done |
+| Mobile-first layout + animations | Done |
 
 ### Not done yet
 
 | Capability | State |
 |------------|--------|
-| Mobile-first layout + animations | Planned (UX sprint) |
 | In-app notification center | Planned (Notify sprint) |
 | Permission-scoped alerts | Broken/unwired |
 | Group/server access requests | Not built |
@@ -67,8 +67,8 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 ```text
 SecureCore (done)
   → BackendHardening (done)
-  → UXMobileFirst (layout + animations + dynamic UX) — next
-  → Permissions+AccessRequests
+  → UXMobileFirst (done)
+  → Permissions+AccessRequests — next
   → InAppNotifications (MVP notify — free)
   → MobileClient (optional; same in-app model)
 ```
@@ -82,16 +82,16 @@ Auth recovery without email/SMS; TOTP; session fixes.
 - Remove duplicate `GET /alerts`  
 - Tests: login, ingest key, reset fulfill, change-password  
 
-### 3) UX — Mobile-first + dynamic + animations — Next
+### 3) UX — Mobile-first + dynamic + animations — Done
 - Responsive **mobile-first** shell (nav, tables → cards/lists on small screens)  
 - Replace `prompt`/`confirm`/`alert` with dialogs/snackbars  
-- Purposeful motion: list enter, severity emphasis, drawer/nav transitions (2–3 consistent patterns)  
+- Purposeful motion: list enter, severity pulse/highlight, drawer/nav transitions (2–3 consistent patterns)  
 - Dynamic feedback: loading skeletons, empty states, optimistic/disabled actions  
 - Theme cleanup (human, restrained — no purple-glow AI look)  
 - Dead component/dep cleanup  
 - Settings stub: keep only what feeds later in-app prefs, or remove noise  
 
-### 4) Permissions + access requests
+### 4) Permissions + access requests — Next
 - Wire `UserPermission` / memberships into alert listing  
 - Access requests (group/server) separate from password-reset requests  
 - Users UI: real group assignment  

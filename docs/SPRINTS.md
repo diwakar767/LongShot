@@ -5,8 +5,8 @@ Canonical decisions: **[ROADMAP.md](./ROADMAP.md)**.
 ```text
 SecureCore (done)
   → BackendHardening          (done)
-  → UXMobileFirst             (next — mobile-first + animations + dynamic UX)
-  → PermissionsAccess         (scoped alerts + access requests)
+  → UXMobileFirst             (done)
+  → PermissionsAccess         (next — scoped alerts + access requests)
   → InAppNotifications        (free notify MVP)
   → MobileClient              (optional; same in-app model)
 ```
@@ -32,20 +32,15 @@ SecureCore (done)
 - Removed duplicate dead `GET /alerts` (kept joined formatter)  
 - Structured JSON logger; tests: login, ingest API key, reset fulfill, change-password  
 
-## Sprint UX — Mobile-first + dynamic + animations — Next
+## Sprint UX — Mobile-first + dynamic + animations — Done
 
-**Goal:** Web app feels modern and usable on phones first; desktop remains solid.
-
-- Mobile-first responsive shell (nav, tables → stacked cards/lists)  
+- Mobile-first responsive shell (temporary drawer on small screens; tables → cards)  
 - Dialogs/snackbars instead of `prompt`/`confirm`/`alert`  
-- Consistent motion: page/list transitions, severity pulse/highlight, drawer  
-- Dynamic UX: loading skeletons, empty states, clear pending actions  
-- Restrained theme (no AI-slop)  
-- Dead code cleanup; Settings trimmed for upcoming in-app prefs  
+- Motion: page enter, list enter, critical severity pulse, drawer  
+- Skeletons + empty states; Settings = local in-app severity prefs only  
+- Theme: teal/slate + DM Sans (no purple-glow AI look); removed unused AlertTable/StatCard  
 
----
-
-## Sprint Permissions + Access Requests
+## Sprint Permissions + Access Requests — Next
 
 - Wire permission/membership filtering on alerts  
 - Group/server **access requests** (separate from password-reset Requests)  

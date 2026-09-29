@@ -1,7 +1,7 @@
 ﻿# Project Status
 
 **Last updated:** 2026-09-29  
-**Active sprint next:** UX Mobile-first + animations  
+**Active sprint next:** Permissions + access requests  
 **Remote:** https://github.com/diwakar767/LongShot.git  
 **Canonical plan:** [ROADMAP.md](./ROADMAP.md) · [SPRINTS.md](./SPRINTS.md)
 
@@ -20,7 +20,8 @@ Lab admin: `admin` / `admin123`
 - Phase 1 (Docker, env, API-key ingest, docs, DB migrate)  
 - Secure Core (reset requests, temp password, TOTP, logout-on-401-only)  
 - E2E **31/31 PASS**  
-- **Backend Hardening** — modular routes/middleware/services, Umzug migrations (no `alter: true`), duplicate `GET /alerts` removed, structured logger, `npm test` (login / ingest / reset+change-password)
+- Backend Hardening (modules, Umzug migrations, tests, logger)  
+- **UX Mobile-first** — responsive shell/drawer, dialogs+snackbars (no prompt/confirm/alert), page/list motion + critical severity pulse, skeletons/empty states, teal/slate theme (DM Sans), Settings trimmed to in-app severity prefs
 
 ## Locked product decisions (see ROADMAP)
 
@@ -30,21 +31,13 @@ Lab admin: `admin` / `admin123`
 
 ## Sequence remaining
 
-1. **UX Mobile-first + animations**  
-2. **Permissions + access requests**  
-3. **In-app notifications**  
-4. **Mobile client** (optional)  
+1. **Permissions + access requests**  
+2. **In-app notifications**  
+3. **Mobile client** (optional)  
 
 ## Still not done
 
-- Mobile-first layout + motion  
 - Permission-scoped alerts  
-- Access-request workflow  
-- In-app notification center  
+- Access-request workflow (group/server)  
+- In-app notification center (bell)  
 - Optional mobile client  
-
-## Backend notes
-
-- Boot: `migrate.js` (Umzug) then `app.listen` — see `alerton-backend/server.js`  
-- Tests: from `alerton-backend`, with Compose Postgres up and `.env` loaded: `npm test`  
-- Fresh DBs get schema from `migrations/001-initial-schema.js`; existing volumes skip creates if `Users` already exists  

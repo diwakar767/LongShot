@@ -1,257 +1,247 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle, 
-  DialogContent, DialogActions 
+import {
+  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle,
+  DialogContent, DialogActions, Skeleton, Stack, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { getGroups, createGroup, updateGroup, deleteGroup, checkAdmin } from '../services/api';
+import { useFeedback } from '../context/FeedbackContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+
+const emptyForm = { group_name: '', description: '' };
 
 const Groups = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
   const [groupsData, setGroupsData] = useState([]);
   const [filteredGroups, setFilteredGroups] = useState([]);
-  const [openAddGroup, setOpenAddGroup] = useState(false);
-  const [newGroup, setNewGroup] = useState({ group_name: '', description: '' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [rowsPerPage] = useState(10);
+  const rowsPerPage = 10;
 
   const fetchGroups = async () => {
+    setLoading(true);
     try {
       const groups = await getGroups();
-      const formattedGroups = groups.map(group => ({
-        id: group.group_id,
-        group_name: group.group_name,
-        description: group.description || '' // Handle null description
+      const formatted = groups.map((g) => ({
+        id: g.group_id,
+        group_name: g.group_name,
+        description: g.description || ''
       }));
-      setGroupsData(formattedGroups);
-      setFilteredGroups(formattedGroups); // Initialize filtered data
+      setGroupsData(formatted);
+      setFilteredGroups(formatted);
     } catch (error) {
-      console.error('Failed to fetch groups:', error);
-      alert(error.response?.data?.error || 'Failed to fetch groups');
+      notifyError(error.response?.data?.error || 'Failed to fetch groups');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const checkAdminStatus = async () => {
-      try {
-        const response = await checkAdmin();
-        console.log('Check admin response:', response);
-        setIsAdmin(true); // If successful, user is admin
-      } catch (error) {
-        console.error('Failed to check admin status:', error.response?.status, error.response?.data);
-        setIsAdmin(false); // 403 or other errors mean not admin
-      }
-    };
-  // Search filtering
   useEffect(() => {
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const filtered = groupsData.filter(group =>
-      group.group_name.toLowerCase().includes(lowercasedQuery) ||
-      group.description.toLowerCase().includes(lowercasedQuery)
-    );
-    setFilteredGroups(filtered);
-    setPage(1); // Reset to first page on search
-  }, [searchQuery, groupsData]);
-
-  useEffect(() => {
-    checkAdminStatus();
+    checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     fetchGroups();
   }, []);
 
-  const handleOpenAddGroup = () => setOpenAddGroup(true);
-  const handleCloseAddGroup = () => {
-    setOpenAddGroup(false);
-    setNewGroup({ group_name: '', description: '' });
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    setFilteredGroups(
+      groupsData.filter(
+        (g) => g.group_name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)
+      )
+    );
+    setPage(1);
+  }, [searchQuery, groupsData]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewGroup({ ...newGroup, [name]: value });
+  const openEdit = (group) => {
+    setEditing(group);
+    setForm({ group_name: group.group_name, description: group.description });
+    setDialogOpen(true);
   };
 
-  const handleAddGroup = async () => {
-    if (newGroup.group_name) {
-      try {
-        await createGroup({ group_name: newGroup.group_name, description: newGroup.description });
-        fetchGroups();
-        handleCloseAddGroup();
-      } catch (error) {
-        console.error('Failed to add group:', error);
-        alert(error.response?.data?.error || 'Failed to add group');
+  const handleSave = async () => {
+    if (!form.group_name) {
+      notifyError('Group name is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateGroup(editing.id, form);
+        notifySuccess('Group updated');
+      } else {
+        await createGroup(form);
+        notifySuccess('Group created');
       }
+      setDialogOpen(false);
+      await fetchGroups();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to save group');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEditGroup = async (group) => {
-    const newGroupName = prompt('New group name:', group.group_name);
-    const newDescription = prompt('New description:', group.description);
-    if (newGroupName || newDescription) {
-      try {
-        await updateGroup(group.id, { 
-          group_name: newGroupName || group.group_name, 
-          description: newDescription || group.description 
-        });
-        fetchGroups();
-      } catch (error) {
-        console.error('Failed to update group:', error);
-        alert(error.response?.data?.error || 'Failed to update group');
-      }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await deleteGroup(deleteTarget.id);
+      notifySuccess('Group deleted');
+      setDeleteTarget(null);
+      await fetchGroups();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to delete group');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteGroup = async (groupId) => {
-    if (window.confirm('Are you sure you want to delete this group?')) {
-      try {
-        await deleteGroup(groupId);
-        fetchGroups();
-      } catch (error) {
-        console.error('Failed to delete group:', error);
-        alert(error.response?.data?.error || 'Failed to delete group');
-      }
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / rowsPerPage));
+  const paginated = filteredGroups.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredGroups.length / rowsPerPage);
-  const paginatedGroups = filteredGroups.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const actions = (group) =>
+    isAdmin && (
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => openEdit(group)}>
+          Edit
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={() => setDeleteTarget(group)}
+        >
+          Delete
+        </Button>
+      </Stack>
+    );
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h1">Groups</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Typography variant="h4">Groups</Typography>
         {isAdmin && (
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={handleOpenAddGroup}
-          sx={{ textTransform: 'none', borderRadius: 3, px: 3, py: 1 }}
-        >
-          Add Group
-        </Button> )}
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Add group
+          </Button>
+        )}
       </Box>
 
-      {/* Add Group Dialog */}
-      <Dialog open={openAddGroup} onClose={handleCloseAddGroup}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Add Group</DialogTitle>
+      <TextField
+        size="small"
+        placeholder="Search groups..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+        sx={{ mb: 2, width: { xs: '100%', sm: 320 } }}
+      />
+
+      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>{editing ? 'Edit group' : 'Add group'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 400, pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               fullWidth
-              label="Group Name"
+              label="Group name"
               name="group_name"
-              value={newGroup.group_name}
-              onChange={handleInputChange}
+              value={form.group_name}
+              onChange={(e) => setForm({ ...form, group_name: e.target.value })}
               size="small"
             />
             <TextField
               fullWidth
               label="Description"
               name="description"
-              value={newGroup.description}
-              onChange={handleInputChange}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               size="small"
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseAddGroup} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleAddGroup} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Save
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Search and Filters */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          size="small"
-          placeholder="Search groups..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-          sx={{ width: 300 }}
-        />
-      </Box>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete group"
+        message={`Delete “${deleteTarget?.group_name}”? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={saving}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
-      {/* Groups Table */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                {/* <TableCell sx={{ fontWeight: 600 }}>ID</TableCell> */}
-                <TableCell sx={{ fontWeight: 600 }}>Group Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedGroups.length === 0 ? (
+      {loading ? (
+        <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} height={56} />)}</Stack>
+      ) : filteredGroups.length === 0 ? (
+        <EmptyState title="No groups found" description="Try another search or add a group." />
+      ) : isMobile ? (
+        <Stack spacing={1.5}>
+          {paginated.map((group) => (
+            <Paper key={group.id} sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={600}>{group.group_name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {group.description || '—'}
+              </Typography>
+              {actions(group)}
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    No groups found
-                  </TableCell>
+                  <TableCell>Group name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              ) : (
-                paginatedGroups.map((group) => (
+              </TableHead>
+              <TableBody>
+                {paginated.map((group) => (
                   <TableRow key={group.id} hover>
-                    {/* <TableCell>{group.id}</TableCell> */}
                     <TableCell sx={{ fontWeight: 500 }}>{group.group_name}</TableCell>
-                    <TableCell>{group.description}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                      {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditGroup(group)}
-                          sx={{ textTransform: 'none', borderRadius: 3, px: 2 }}
-                        >
-                          Edit
-                        </Button> )}
-                      {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleDeleteGroup(group.id)}
-                          sx={{
-                            textTransform: 'none',
-                            borderRadius: 3,
-                            px: 2,
-                            color: 'error.main',
-                            borderColor: 'error.main',
-                            '&:hover': { borderColor: 'error.main' }
-                          }}
-                        >
-                          Delete
-                        </Button> )}
-                      </Box>
-                    </TableCell>
+                    <TableCell>{group.description || '—'}</TableCell>
+                    <TableCell>{actions(group)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(e, newPage) => setPage(newPage)}
-          shape="rounded"
-        />
-      </Box>
+      {filteredGroups.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination count={totalPages} page={page} onChange={(e, p) => setPage(p)} shape="rounded" />
+        </Box>
+      )}
     </Box>
   );
 };

@@ -1,39 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle, 
-  DialogContent, DialogActions, MenuItem 
+import {
+  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle,
+  DialogContent, DialogActions, MenuItem, Skeleton, Stack, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { getServers, createServer, updateServer, deleteServer, getCountries, checkAdmin } from '../services/api';
+import { useFeedback } from '../context/FeedbackContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+
+const emptyForm = { server_name: '', ip_address: '', country_name: '' };
 
 const Servers = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
   const [serversData, setServersData] = useState([]);
   const [filteredServers, setFilteredServers] = useState([]);
   const [countries, setCountries] = useState([]);
-  const [openAddServer, setOpenAddServer] = useState(false);
-  const [newServer, setNewServer] = useState({
-    server_name: '',
-    ip_address: '',
-    country_name: ''
-  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [rowsPerPage] = useState(10);
+  const rowsPerPage = 10;
 
-  // Fetch servers and countries
   const fetchServers = async () => {
+    setLoading(true);
     try {
       const servers = await getServers();
       setServersData(servers);
-      setFilteredServers(servers); // Initialize filtered data
+      setFilteredServers(servers);
     } catch (error) {
-      console.error('Failed to fetch servers:', error);
-      alert(error.response?.data?.error || 'Failed to fetch servers');
+      notifyError(error.response?.data?.error || 'Failed to fetch servers');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,133 +51,142 @@ const Servers = () => {
       const countryData = await getCountries();
       setCountries(countryData);
     } catch (error) {
-      console.error('Failed to fetch countries:', error);
-      alert(error.response?.data?.error || 'Failed to fetch countries');
+      notifyError(error.response?.data?.error || 'Failed to fetch countries');
     }
   };
 
-  const checkAdminStatus = async () => {
-      try {
-        const response = await checkAdmin();
-        console.log('Check admin response:', response);
-        setIsAdmin(true); // If successful, user is admin
-      } catch (error) {
-        console.error('Failed to check admin status:', error.response?.status, error.response?.data);
-        setIsAdmin(false); // 403 or other errors mean not admin
-      }
-    };
-
-  // Search filtering
   useEffect(() => {
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const filtered = serversData.filter(server =>
-      server.name.toLowerCase().includes(lowercasedQuery) ||
-      server.ip.toLowerCase().includes(lowercasedQuery) ||
-      server.country.toLowerCase().includes(lowercasedQuery)
-    );
-    setFilteredServers(filtered);
-    setPage(1); // Reset to first page on search
-  }, [searchQuery, serversData]);
-
-  useEffect(() => {
-    checkAdminStatus();
+    checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     fetchServers();
     fetchCountries();
   }, []);
 
-  const handleOpenAddServer = () => setOpenAddServer(true);
-  const handleCloseAddServer = () => {
-    setOpenAddServer(false);
-    setNewServer({ server_name: '', ip_address: '', country_name: '' });
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    setFilteredServers(
+      serversData.filter(
+        (server) =>
+          (server.name || '').toLowerCase().includes(q) ||
+          (server.ip || '').toLowerCase().includes(q) ||
+          (server.country || '').toLowerCase().includes(q)
+      )
+    );
+    setPage(1);
+  }, [searchQuery, serversData]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewServer({ ...newServer, [name]: value });
+  const openEdit = (server) => {
+    setEditing(server);
+    setForm({
+      server_name: server.name || '',
+      ip_address: server.ip || '',
+      country_name: server.country || ''
+    });
+    setDialogOpen(true);
   };
 
-  const handleAddServer = async () => {
-    if (newServer.server_name && newServer.ip_address && newServer.country_name) {
-      try {
-        await createServer(newServer);
-        fetchServers();
-        handleCloseAddServer();
-      } catch (error) {
-        console.error('Failed to add server:', error);
-        alert(error.response?.data?.error || 'Failed to add server');
+  const handleSave = async () => {
+    if (!form.server_name || !form.ip_address || !form.country_name) {
+      notifyError('Server name, IP address, and country are required');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateServer(editing.id, form);
+        notifySuccess('Server updated');
+      } else {
+        await createServer(form);
+        notifySuccess('Server created');
       }
+      setDialogOpen(false);
+      await fetchServers();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to save server');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEditServer = async (server) => {
-    const newName = prompt('New server name:', server.name);
-    const newIp = prompt('New IP address:', server.ip);
-    const newCountry = prompt('New country name:', server.country);
-    if (newName || newIp || newCountry) {
-      try {
-        await updateServer(server.id, {
-          server_name: newName || server.name,
-          ip_address: newIp || server.ip,
-          country_name: newCountry || server.country
-        });
-        fetchServers();
-      } catch (error) {
-        console.error('Failed to update server:', error);
-        alert(error.response?.data?.error || 'Failed to update server');
-      }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await deleteServer(deleteTarget.id);
+      notifySuccess('Server deleted');
+      setDeleteTarget(null);
+      await fetchServers();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to delete server');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteServer = async (serverId) => {
-    if (window.confirm('Are you sure you want to delete this server?')) {
-      try {
-        await deleteServer(serverId);
-        fetchServers();
-      } catch (error) {
-        console.error('Failed to delete server:', error);
-        alert(error.response?.data?.error || 'Failed to delete server');
-      }
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredServers.length / rowsPerPage));
+  const paginated = filteredServers.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredServers.length / rowsPerPage);
-  const paginatedServers = filteredServers.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const actions = (server) =>
+    isAdmin && (
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => openEdit(server)}>
+          Edit
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={() => setDeleteTarget(server)}
+        >
+          Delete
+        </Button>
+      </Stack>
+    );
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h1">Servers</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Typography variant="h4">Servers</Typography>
         {isAdmin && (
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={handleOpenAddServer}
-          sx={{ textTransform: 'none', borderRadius: 3, px: 3, py: 1 }}
-        >
-          Add Server
-        </Button> ) }
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Add server
+          </Button>
+        )}
       </Box>
 
-      {/* Add Server Dialog */}
-      <Dialog open={openAddServer} onClose={handleCloseAddServer}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Add Server</DialogTitle>
+      <TextField
+        size="small"
+        placeholder="Search servers..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+        sx={{ mb: 2, width: { xs: '100%', sm: 320 } }}
+      />
+
+      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>{editing ? 'Edit server' : 'Add server'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 400, pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               fullWidth
-              label="Server Name"
+              label="Server name"
               name="server_name"
-              value={newServer.server_name}
-              onChange={handleInputChange}
+              value={form.server_name}
+              onChange={(e) => setForm({ ...form, server_name: e.target.value })}
               size="small"
             />
             <TextField
               fullWidth
-              label="IP Address"
+              label="IP address"
               name="ip_address"
-              value={newServer.ip_address}
-              onChange={handleInputChange}
+              value={form.ip_address}
+              onChange={(e) => setForm({ ...form, ip_address: e.target.value })}
               size="small"
             />
             <TextField
@@ -176,8 +194,8 @@ const Servers = () => {
               fullWidth
               label="Country"
               name="country_name"
-              value={newServer.country_name}
-              onChange={handleInputChange}
+              value={form.country_name}
+              onChange={(e) => setForm({ ...form, country_name: e.target.value })}
               size="small"
             >
               {countries.map((country) => (
@@ -188,102 +206,73 @@ const Servers = () => {
             </TextField>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseAddServer} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleAddServer} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Save
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Search and Filters */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          size="small"
-          placeholder="Search servers..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-          sx={{ width: 300 }}
-        />
-      </Box>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete server"
+        message={`Delete “${deleteTarget?.name}”? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={saving}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
-      {/* Servers Table */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                {/* <TableCell sx={{ fontWeight: 600 }}>ID</TableCell> */}
-                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>IP Address</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Country</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedServers.length === 0 ? (
+      {loading ? (
+        <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} height={56} />)}</Stack>
+      ) : filteredServers.length === 0 ? (
+        <EmptyState title="No servers found" description="Try another search or add a server." />
+      ) : isMobile ? (
+        <Stack spacing={1.5}>
+          {paginated.map((server) => (
+            <Paper key={server.id} sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={600}>{server.name}</Typography>
+              <Typography variant="body2" color="text.secondary">{server.ip}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {server.country || '—'}
+              </Typography>
+              {actions(server)}
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    No servers found
-                  </TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>IP address</TableCell>
+                  <TableCell>Country</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              ) : (
-                paginatedServers.map((server) => (
+              </TableHead>
+              <TableBody>
+                {paginated.map((server) => (
                   <TableRow key={server.id} hover>
-                    {/* <TableCell>{server.id}</TableCell> */}
                     <TableCell sx={{ fontWeight: 500 }}>{server.name}</TableCell>
                     <TableCell>{server.ip}</TableCell>
                     <TableCell>{server.country}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                      {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditServer(server)}
-                          sx={{ textTransform: 'none', borderRadius: 3, px: 2 }}
-                        >
-                          Edit
-                        </Button> )}
-                      {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleDeleteServer(server.id)}
-                          sx={{
-                            textTransform: 'none',
-                            borderRadius: 3,
-                            px: 2,
-                            color: 'error.main',
-                            borderColor: 'error.main',
-                            '&:hover': { borderColor: 'error.main' }
-                          }}
-                        >
-                          Delete
-                        </Button> )}
-                      </Box>
-                    </TableCell>
+                    <TableCell>{actions(server)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(e, newPage) => setPage(newPage)}
-          shape="rounded"
-        />
-      </Box>
+      {filteredServers.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination count={totalPages} page={page} onChange={(e, p) => setPage(p)} shape="rounded" />
+        </Box>
+      )}
     </Box>
   );
 };

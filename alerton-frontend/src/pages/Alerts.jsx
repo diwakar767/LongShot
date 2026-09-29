@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Typography, Chip, TextField, InputAdornment, Pagination, MenuItem, FormControl,
+  Typography, TextField, InputAdornment, Pagination, MenuItem, FormControl,
   Select, Grid, Button, Checkbox, ListItemText, InputLabel, IconButton, Dialog,
-  DialogTitle, DialogContent, DialogActions, Snackbar, Alert, CircularProgress
+  DialogTitle, DialogContent, DialogActions, Skeleton, Stack, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
@@ -11,120 +11,92 @@ import ClearIcon from '@mui/icons-material/Clear';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 import { getAlerts, createAlert, checkAdmin } from '../services/api';
+import { useFeedback } from '../context/FeedbackContext';
+import EmptyState from '../components/EmptyState';
+import SeverityChip from '../components/SeverityChip';
 
-const ITEM_HEIGHT = 48;
-const ITEM_PADDING_TOP = 8;
 const MenuProps = {
-  PaperProps: {
-    style: { maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP, width: 250 }
-  }
+  PaperProps: { style: { maxHeight: 48 * 4.5 + 8, width: 250 } }
 };
 
 const Alerts = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
   const [alerts, setAlerts] = useState([]);
   const [filters, setFilters] = useState({
     countries: [], apps: [], severities: [], groups: [], servers: [], search: ''
   });
   const [page, setPage] = useState(1);
-  const [rowsPerPage] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const rowsPerPage = 10;
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [openAddAlert, setOpenAddAlert] = useState(false);
   const [newAlert, setNewAlert] = useState({
     message: '', severity: 'minor', country: '', server: '', app: '', group: ''
   });
-  const [openViewDialog, setOpenViewDialog] = useState(false); // State for view dialog
-  const [selectedMessage, setSelectedMessage] = useState(''); // State for full message
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState('');
 
-  // Fetch alerts from backend
   const fetchAlerts = async () => {
     setLoading(true);
     try {
       const data = await getAlerts();
-      const formattedData = data.map(alert => ({
-        ...alert,
-        severity: alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)
-      }));
-      setAlerts(formattedData);
+      setAlerts(
+        data.map((alert) => ({
+          ...alert,
+          severity: alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)
+        }))
+      );
     } catch (error) {
-      console.error('Failed to fetch alerts:', error);
-      setError(error.response?.data?.error || 'Failed to fetch alerts');
+      notifyError(error.response?.data?.error || 'Failed to fetch alerts');
     } finally {
       setLoading(false);
     }
   };
- 
-  const checkAdminStatus = async () => {
-    try {
-      const response = await checkAdmin();
-      console.log('Check admin response:', response);
-      setIsAdmin(true); // If successful, user is admin
-    } catch (error) {
-      console.error('Failed to check admin status:', error.response?.status, error.response?.data);
-      setIsAdmin(false); // 403 or other errors mean not admin
-    }
-  };
 
   useEffect(() => {
-  checkAdminStatus();
-  fetchAlerts();
+    checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
+    fetchAlerts();
   }, []);
 
-  // Filter options
-  const allCountries = [...new Set(alerts.map(alert => alert.country))].filter(Boolean);
-  const allApps = [...new Set(alerts.map(alert => alert.app))].filter(Boolean);
+  const allCountries = [...new Set(alerts.map((a) => a.country))].filter(Boolean);
+  const allApps = [...new Set(alerts.map((a) => a.app))].filter(Boolean);
   const allSeverities = ['Critical', 'Major', 'Minor', 'Trivial'];
-  const allGroups = [...new Set(alerts.map(alert => alert.group))].filter(Boolean);
-  const allServers = [...new Set(alerts.map(alert => alert.server))].filter(Boolean);
+  const allGroups = [...new Set(alerts.map((a) => a.group))].filter(Boolean);
+  const allServers = [...new Set(alerts.map((a) => a.server))].filter(Boolean);
 
-  // Filter alerts
-  const filteredAlerts = alerts.filter(alert => {
+  const filteredAlerts = alerts.filter((alert) => {
     const countryMatch = filters.countries.length === 0 || filters.countries.includes(alert.country);
     const appMatch = filters.apps.length === 0 || filters.apps.includes(alert.app);
     const severityMatch = filters.severities.length === 0 || filters.severities.includes(alert.severity);
     const groupMatch = filters.groups.length === 0 || filters.groups.includes(alert.group);
     const serverMatch = filters.servers.length === 0 || filters.servers.includes(alert.server);
+    const q = filters.search.toLowerCase();
     const searchMatch =
-      alert.message.toLowerCase().includes(filters.search.toLowerCase()) ||
-      alert.country.toLowerCase().includes(filters.search.toLowerCase()) ||
-      alert.app.toLowerCase().includes(filters.search.toLowerCase()) ||
-      alert.group.toLowerCase().includes(filters.search.toLowerCase()) ||
-      alert.server.toLowerCase().includes(filters.search.toLowerCase()) ||
-      alert.serverIp.toLowerCase().includes(filters.search.toLowerCase());
+      !q ||
+      [alert.message, alert.country, alert.app, alert.group, alert.server, alert.serverIp]
+        .join(' ')
+        .toLowerCase()
+        .includes(q);
     return countryMatch && appMatch && severityMatch && groupMatch && serverMatch && searchMatch;
   });
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAlerts.length / rowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / rowsPerPage));
   const paginatedAlerts = filteredAlerts.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   const handleFilterChange = (name, value) => {
-    setFilters(prev => ({ ...prev, [name]: value }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
     setPage(1);
-  };
-
-  const resetFilters = () => {
-    setFilters({ countries: [], apps: [], severities: [], groups: [], servers: [], search: '' });
-    setPage(1);
-  };
-
-  const handleAddAlertOpen = () => setOpenAddAlert(true);
-  const handleAddAlertClose = () => {
-    setOpenAddAlert(false);
-    setNewAlert({ message: '', severity: 'minor', country: '', server: '', app: '', group: '' });
-  };
-
-  const handleAlertChange = (e) => {
-    const { name, value } = e.target;
-    setNewAlert(prev => ({ ...prev, [name]: value }));
   };
 
   const handleAddAlert = async () => {
     if (!newAlert.message) {
-      setError('Message is required');
+      notifyError('Message is required');
       return;
     }
+    setSaving(true);
     try {
       await createAlert({
         message: newAlert.message,
@@ -134,150 +106,121 @@ const Alerts = () => {
         app_name: newAlert.app,
         group_name: newAlert.group
       });
+      notifySuccess('Alert created');
+      setOpenAddAlert(false);
+      setNewAlert({ message: '', severity: 'minor', country: '', server: '', app: '', group: '' });
       await fetchAlerts();
-      handleAddAlertClose();
     } catch (error) {
-      console.error('Failed to create alert:', error);
-      setError(error.response?.data?.error || 'Failed to create alert');
+      notifyError(error.response?.data?.error || 'Failed to create alert');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleViewMessage = (message) => {
-    setSelectedMessage(message);
-    setOpenViewDialog(true);
-  };
+  const trimMessage = (message) => (message.length > 40 ? `${message.slice(0, 40)}…` : message);
+  const formatTs = (ts) =>
+    new Date(ts).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
-  const handleCloseViewDialog = () => {
-    setOpenViewDialog(false);
-    setSelectedMessage('');
-  };
-
-  const handleCloseSnackbar = () => {
-    setError(null);
-  };
-
-  const severityColors = {
-    Critical: 'error',
-    Major: 'warning',
-    Minor: 'info',
-    Trivial: 'success'
-  };
-
-  // Trim message to 15 characters and append ...
-  const trimMessage = (message) => {
-    return message.length > 15 ? `${message.slice(0, 15)}...` : message;
-  };
+  const multiSelect = (label, name, options, values) => (
+    <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
+      <InputLabel>{label}</InputLabel>
+      <Select
+        multiple
+        value={values}
+        onChange={(e) => handleFilterChange(name, e.target.value)}
+        renderValue={(selected) => selected.join(', ')}
+        MenuProps={MenuProps}
+        label={label}
+      >
+        {options.map((opt) => (
+          <MenuItem key={opt} value={opt}>
+            <Checkbox checked={values.includes(opt)} />
+            <ListItemText primary={opt} />
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <Typography variant="h4">Alerts</Typography>
         {isAdmin && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleAddAlertOpen}
-            sx={{ textTransform: 'none', borderRadius: 3, px: 3, py: 1 }}
-          >
-            Add Alert
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenAddAlert(true)}>
+            Add alert
           </Button>
         )}
       </Box>
 
-      {/* Add Alert Dialog */}
-      <Dialog open={openAddAlert} onClose={handleAddAlertClose}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Add Alert</DialogTitle>
+      <Dialog open={openAddAlert} onClose={() => !saving && setOpenAddAlert(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>Add alert</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 400, pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               fullWidth
               label="Message"
               name="message"
               value={newAlert.message}
-              onChange={handleAlertChange}
+              onChange={(e) => setNewAlert({ ...newAlert, message: e.target.value })}
               size="small"
               required
-              error={!!error && !newAlert.message}
-              helperText={error && !newAlert.message ? 'Message is required' : ''}
             />
             <FormControl fullWidth size="small">
               <InputLabel>Severity</InputLabel>
               <Select
                 value={newAlert.severity}
                 name="severity"
-                onChange={handleAlertChange}
                 label="Severity"
+                onChange={(e) => setNewAlert({ ...newAlert, severity: e.target.value })}
               >
-                {allSeverities.map(severity => (
-                  <MenuItem key={severity} value={severity.toLowerCase()}>
-                    {severity}
+                {allSeverities.map((s) => (
+                  <MenuItem key={s} value={s.toLowerCase()}>
+                    {s}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            <TextField
-              fullWidth
-              label="Country"
-              name="country"
-              value={newAlert.country}
-              onChange={handleAlertChange}
-              size="small"
-            />
-            <TextField
-              fullWidth
-              label="Server"
-              name="server"
-              value={newAlert.server}
-              onChange={handleAlertChange}
-              size="small"
-            />
-            <TextField
-              fullWidth
-              label="App"
-              name="app"
-              value={newAlert.app}
-              onChange={handleAlertChange}
-              size="small"
-            />
-            <TextField
-              fullWidth
-              label="Group"
-              name="group"
-              value={newAlert.group}
-              onChange={handleAlertChange}
-              size="small"
-            />
+            {['country', 'server', 'app', 'group'].map((field) => (
+              <TextField
+                key={field}
+                fullWidth
+                label={field.charAt(0).toUpperCase() + field.slice(1)}
+                name={field}
+                value={newAlert[field]}
+                onChange={(e) => setNewAlert({ ...newAlert, [field]: e.target.value })}
+                size="small"
+              />
+            ))}
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleAddAlertClose} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleAddAlert} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Save
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpenAddAlert(false)} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddAlert} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* View Message Dialog */}
-      <Dialog open={openViewDialog} onClose={handleCloseViewDialog}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Alert Description</DialogTitle>
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>Alert description</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ wordBreak: 'break-word', p: 2 }}>
-            {selectedMessage}
-          </Typography>
+          <Typography sx={{ wordBreak: 'break-word', py: 1 }}>{selectedMessage}</Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseViewDialog} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Close
-          </Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpenViewDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Search and Filters */}
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
+      <Paper sx={{ p: { xs: 2, sm: 2.5 }, mb: 2, borderRadius: 2 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={5}>
             <TextField
               fullWidth
               size="small"
@@ -285,207 +228,137 @@ const Alerts = () => {
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
               InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-              aria-label="Search alerts"
             />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <FilterAltIcon color="action" />
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Country</InputLabel>
-                <Select
-                  multiple
-                  value={filters.countries}
-                  onChange={(e) => handleFilterChange('countries', e.target.value)}
-                  renderValue={(selected) => selected.join(', ')}
-                  MenuProps={MenuProps}
-                  label="Country"
-                >
-                  {allCountries.map((country) => (
-                    <MenuItem key={country} value={country}>
-                      <Checkbox checked={filters.countries.includes(country)} />
-                      <ListItemText primary={country} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Severity</InputLabel>
-                <Select
-                  multiple
-                  value={filters.severities}
-                  onChange={(e) => handleFilterChange('severities', e.target.value)}
-                  renderValue={(selected) => selected.join(', ')}
-                  MenuProps={MenuProps}
-                  label="Severity"
-                >
-                  {allSeverities.map((severity) => (
-                    <MenuItem key={severity} value={severity}>
-                      <Checkbox checked={filters.severities.includes(severity)} />
-                      <ListItemText primary={severity} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Button onClick={resetFilters} startIcon={<ClearIcon />} size="small" sx={{ textTransform: 'none' }}>
+          <Grid item xs={12} md={7}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <FilterAltIcon color="action" sx={{ display: { xs: 'none', sm: 'block' } }} />
+              {multiSelect('Country', 'countries', allCountries, filters.countries)}
+              {multiSelect('Severity', 'severities', allSeverities, filters.severities)}
+              {multiSelect('App', 'apps', allApps, filters.apps)}
+              {multiSelect('Group', 'groups', allGroups, filters.groups)}
+              {multiSelect('Server', 'servers', allServers, filters.servers)}
+              <Button
+                onClick={() => {
+                  setFilters({ countries: [], apps: [], severities: [], groups: [], servers: [], search: '' });
+                  setPage(1);
+                }}
+                startIcon={<ClearIcon />}
+                size="small"
+              >
                 Clear
               </Button>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>App</InputLabel>
-                <Select
-                  multiple
-                  value={filters.apps}
-                  onChange={(e) => handleFilterChange('apps', e.target.value)}
-                  renderValue={(selected) => selected.join(', ')}
-                  MenuProps={MenuProps}
-                  label="App"
-                >
-                  {allApps.map((app) => (
-                    <MenuItem key={app} value={app}>
-                      <Checkbox checked={filters.apps.includes(app)} />
-                      <ListItemText primary={app} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Group</InputLabel>
-                <Select
-                  multiple
-                  value={filters.groups}
-                  onChange={(e) => handleFilterChange('groups', e.target.value)}
-                  renderValue={(selected) => selected.join(', ')}
-                  MenuProps={MenuProps}
-                  label="Group"
-                >
-                  {allGroups.map((group) => (
-                    <MenuItem key={group} value={group}>
-                      <Checkbox checked={filters.groups.includes(group)} />
-                      <ListItemText primary={group} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel>Server</InputLabel>
-                <Select
-                  multiple
-                  value={filters.servers}
-                  onChange={(e) => handleFilterChange('servers', e.target.value)}
-                  renderValue={(selected) => selected.join(', ')}
-                  MenuProps={MenuProps}
-                  label="Server"
-                >
-                  {allServers.map((server) => (
-                    <MenuItem key={server} value={server}>
-                      <Checkbox checked={filters.servers.includes(server)} />
-                      <ListItemText primary={server} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
             </Box>
           </Grid>
         </Grid>
       </Paper>
 
-      {/* Alerts Table */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer sx={{ maxHeight: 400 }}>
-          <Table stickyHeader aria-label="Alerts table">
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Message</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Severity</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Country</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Server</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Server IP</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>App</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Group</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Timestamp</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>View</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
+      {loading ? (
+        <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} height={64} />)}</Stack>
+      ) : filteredAlerts.length === 0 ? (
+        <EmptyState title="No alerts found" description="Adjust filters or create an alert." />
+      ) : isMobile ? (
+        <Stack spacing={1.5}>
+          {paginatedAlerts.map((alert) => (
+            <Paper
+              key={alert.id}
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                animation: 'listEnter 280ms ease-out',
+                '@keyframes listEnter': {
+                  from: { opacity: 0, transform: 'translateY(8px)' },
+                  to: { opacity: 1, transform: 'translateY(0)' }
+                }
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+                <SeverityChip severity={alert.severity} />
+                <IconButton
+                  size="small"
+                  aria-label="View message"
+                  onClick={() => {
+                    setSelectedMessage(alert.message);
+                    setOpenViewDialog(true);
+                  }}
+                >
+                  <VisibilityIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              <Typography fontWeight={600} sx={{ mb: 0.5 }}>
+                {trimMessage(alert.message)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {alert.server} · {alert.app} · {alert.country}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatTs(alert.timestamp)}
+              </Typography>
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer sx={{ maxHeight: 480 }}>
+            <Table stickyHeader>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <CircularProgress />
-                  </TableCell>
+                  <TableCell>Message</TableCell>
+                  <TableCell>Severity</TableCell>
+                  <TableCell>Country</TableCell>
+                  <TableCell>Server</TableCell>
+                  <TableCell>App</TableCell>
+                  <TableCell>Group</TableCell>
+                  <TableCell>Timestamp</TableCell>
+                  <TableCell>View</TableCell>
                 </TableRow>
-              ) : paginatedAlerts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    No alerts found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedAlerts.map((alert) => (
-                  <TableRow key={alert.id} hover>
+              </TableHead>
+              <TableBody>
+                {paginatedAlerts.map((alert) => (
+                  <TableRow
+                    key={alert.id}
+                    hover
+                    sx={{
+                      animation: 'listEnter 280ms ease-out',
+                      '@keyframes listEnter': {
+                        from: { opacity: 0, transform: 'translateY(4px)' },
+                        to: { opacity: 1, transform: 'translateY(0)' }
+                      }
+                    }}
+                  >
                     <TableCell sx={{ fontWeight: 500 }}>{trimMessage(alert.message)}</TableCell>
                     <TableCell>
-                      <Chip
-                        label={alert.severity}
-                        color={severityColors[alert.severity]}
-                        size="small"
-                      />
+                      <SeverityChip severity={alert.severity} />
                     </TableCell>
                     <TableCell>{alert.country}</TableCell>
                     <TableCell>{alert.server}</TableCell>
-                    <TableCell>{alert.serverIp}</TableCell>
                     <TableCell>{alert.app}</TableCell>
                     <TableCell>{alert.group}</TableCell>
-                    <TableCell>
-                      {new Date(alert.timestamp).toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </TableCell>
+                    <TableCell>{formatTs(alert.timestamp)}</TableCell>
                     <TableCell>
                       <IconButton
                         size="small"
-                        onClick={() => handleViewMessage(alert.message)}
+                        onClick={() => {
+                          setSelectedMessage(alert.message);
+                          setOpenViewDialog(true);
+                        }}
                       >
                         <VisibilityIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(e, newPage) => setPage(newPage)}
-          shape="rounded"
-          aria-label="Alerts pagination"
-        />
-      </Box>
-
-      {/* Error Snackbar */}
-      <Snackbar
-        open={!!error}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
-          {error}
-        </Alert>
-      </Snackbar>
+      {filteredAlerts.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination count={totalPages} page={page} onChange={(e, p) => setPage(p)} shape="rounded" />
+        </Box>
+      )}
     </Box>
   );
 };

@@ -1,125 +1,99 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState, useEffect } from 'react';
+import {
   Box,
   Paper,
   Typography,
   FormControlLabel,
   Switch,
-//   Divider,
-  Button
+  Button,
+  Alert
 } from '@mui/material';
+import { useFeedback } from '../context/FeedbackContext';
 
+const STORAGE_KEY = 'longshot_inapp_severity_prefs';
+
+const defaults = {
+  critical: true,
+  major: true,
+  minor: false,
+  trivial: false
+};
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaults;
+    return { ...defaults, ...JSON.parse(raw) };
+  } catch {
+    return defaults;
+  }
+}
+
+/** Trimmed Settings: severity prefs for upcoming in-app notifications only. */
 const Settings = () => {
-  const [notificationSettings, setNotificationSettings] = useState({
-    critical: true,
-    major: true,
-    minor: false,
-    trivial: false
-  });
+  const { notifySuccess } = useFeedback();
+  const [prefs, setPrefs] = useState(loadPrefs);
+  const [dirty, setDirty] = useState(false);
 
-  const handleNotificationChange = (event) => {
-    setNotificationSettings({
-      ...notificationSettings,
-      [event.target.name]: event.target.checked
-    });
+  useEffect(() => {
+    setPrefs(loadPrefs());
+  }, []);
+
+  const handleChange = (event) => {
+    setPrefs((prev) => ({ ...prev, [event.target.name]: event.target.checked }));
+    setDirty(true);
+  };
+
+  const handleSave = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    setDirty(false);
+    notifySuccess('In-app notification preferences saved on this device');
   };
 
   return (
     <Box>
-      <Typography variant="h1" gutterBottom>
-        Notification Settings
+      <Typography variant="h4" gutterBottom>
+        Settings
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 520 }}>
+        Choose which alert severities should create in-app notifications. Delivery wires up in the
+        In-App Notifications sprint; prefs are stored locally for now.
       </Typography>
 
-      {/* Push Notifications Section */}
-      <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
-        <Typography variant="h6" component="h2" gutterBottom sx={{ fontWeight: 600 }}>
-          Push Notifications
+      <Alert severity="info" sx={{ mb: 2 }}>
+        No email, SMS, or paid push — in-app inbox only.
+      </Alert>
+
+      <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 2 }}>
+        <Typography variant="h2" gutterBottom>
+          In-app notify by severity
         </Typography>
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={notificationSettings.critical}
-                onChange={handleNotificationChange}
-                name="critical"
-                color="error"
-              />
-            }
-            label="Critical"
-            sx={{ 
-              '& .MuiFormControlLabel-label': {
-                fontWeight: 500,
-                fontSize: '1rem'
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
+          {[
+            { name: 'critical', label: 'Critical', color: 'error' },
+            { name: 'major', label: 'Major', color: 'warning' },
+            { name: 'minor', label: 'Minor', color: 'info' },
+            { name: 'trivial', label: 'Trivial', color: 'success' }
+          ].map((row) => (
+            <FormControlLabel
+              key={row.name}
+              control={
+                <Switch
+                  checked={prefs[row.name]}
+                  onChange={handleChange}
+                  name={row.name}
+                  color={row.color}
+                />
               }
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={notificationSettings.major}
-                onChange={handleNotificationChange}
-                name="major"
-                color="warning"
-              />
-            }
-            label="Major"
-            sx={{ 
-              '& .MuiFormControlLabel-label': {
-                fontWeight: 500,
-                fontSize: '1rem'
-              }
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={notificationSettings.minor}
-                onChange={handleNotificationChange}
-                name="minor"
-                color="info"
-              />
-            }
-            label="Minor"
-            sx={{ 
-              '& .MuiFormControlLabel-label': {
-                fontWeight: 500,
-                fontSize: '1rem'
-              }
-            }}
-          />
-          <FormControlLabel
-            control={
-              <Switch
-                checked={notificationSettings.trivial}
-                onChange={handleNotificationChange}
-                name="trivial"
-                color="success"
-              />
-            }
-            label="Trivial"
-            sx={{ 
-              '& .MuiFormControlLabel-label': {
-                fontWeight: 500,
-                fontSize: '1rem'
-              }
-            }}
-          />
+              label={row.label}
+            />
+          ))}
         </Box>
       </Paper>
 
-      {/* Save Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          variant="contained"
-          sx={{
-            textTransform: 'none',
-            borderRadius: 3,
-            px: 4,
-            py: 1.5
-          }}
-        >
-          Save Settings
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+        <Button variant="contained" onClick={handleSave} disabled={!dirty}>
+          Save preferences
         </Button>
       </Box>
     </Box>

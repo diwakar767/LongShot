@@ -1,255 +1,244 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle, 
-  DialogContent, DialogActions 
+import {
+  Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle,
+  DialogContent, DialogActions, Skeleton, Stack, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { getApplications, createApplication, updateApplication, deleteApplication, checkAdmin } from '../services/api';
+import { useFeedback } from '../context/FeedbackContext';
+import ConfirmDialog from '../components/ConfirmDialog';
+import EmptyState from '../components/EmptyState';
+
+const emptyForm = { app_name: '', description: '' };
 
 const Applications = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
   const [applicationsData, setApplicationsData] = useState([]);
   const [filteredApplications, setFilteredApplications] = useState([]);
-  const [openAddApplication, setOpenAddApplication] = useState(false);
-  const [newApplication, setNewApplication] = useState({
-    app_name: '',
-    description: ''
-  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [rowsPerPage] = useState(10);
+  const rowsPerPage = 10;
 
-  // Fetch applications from backend
   const fetchApplications = async () => {
+    setLoading(true);
     try {
       const apps = await getApplications();
       setApplicationsData(apps);
-      setFilteredApplications(apps); // Initialize filtered data
+      setFilteredApplications(apps);
     } catch (error) {
-      console.error('Failed to fetch applications:', error);
-      alert(error.response?.data?.error || 'Failed to fetch applications');
+      notifyError(error.response?.data?.error || 'Failed to fetch applications');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const checkAdminStatus = async () => {
-    try {
-      const response = await checkAdmin();
-      console.log('Check admin response:', response);
-      setIsAdmin(true); // If successful, user is admin
-    } catch (error) {
-      console.error('Failed to check admin status:', error.response?.status, error.response?.data);
-      setIsAdmin(false); // 403 or other errors mean not admin
-    }
-  };
-  // Search filtering
   useEffect(() => {
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const filtered = applicationsData.filter(app =>
-      app.name.toLowerCase().includes(lowercasedQuery) ||
-      (app.description && app.description.toLowerCase().includes(lowercasedQuery))
-    );
-    setFilteredApplications(filtered);
-    setPage(1); // Reset to first page on search
-  }, [searchQuery, applicationsData]);
-
-  useEffect(() => {
-    checkAdminStatus();
+    checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     fetchApplications();
   }, []);
 
-  const handleOpenAddApplication = () => setOpenAddApplication(true);
-  const handleCloseAddApplication = () => {
-    setOpenAddApplication(false);
-    setNewApplication({ app_name: '', description: '' });
+  useEffect(() => {
+    const q = searchQuery.toLowerCase();
+    setFilteredApplications(
+      applicationsData.filter(
+        (app) =>
+          (app.name || '').toLowerCase().includes(q) ||
+          (app.description || '').toLowerCase().includes(q)
+      )
+    );
+    setPage(1);
+  }, [searchQuery, applicationsData]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewApplication({ ...newApplication, [name]: value });
+  const openEdit = (app) => {
+    setEditing(app);
+    setForm({ app_name: app.name || '', description: app.description || '' });
+    setDialogOpen(true);
   };
 
-  const handleAddApplication = async () => {
-    if (newApplication.app_name) {
-      try {
-        await createApplication(newApplication);
-        fetchApplications();
-        handleCloseAddApplication();
-      } catch (error) {
-        console.error('Failed to add application:', error);
-        alert(error.response?.data?.error || 'Failed to add application');
+  const handleSave = async () => {
+    if (!form.app_name) {
+      notifyError('Application name is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateApplication(editing.id, form);
+        notifySuccess('Application updated');
+      } else {
+        await createApplication(form);
+        notifySuccess('Application created');
       }
+      setDialogOpen(false);
+      await fetchApplications();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to save application');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEditApplication = async (app) => {
-    const newName = prompt('New application name:', app.name);
-    const newDescription = prompt('New description:', app.description);
-    if (newName || newDescription) {
-      try {
-        await updateApplication(app.id, {
-          app_name: newName || app.name,
-          description: newDescription || app.description
-        });
-        fetchApplications();
-      } catch (error) {
-        console.error('Failed to update application:', error);
-        alert(error.response?.data?.error || 'Failed to update application');
-      }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await deleteApplication(deleteTarget.id);
+      notifySuccess('Application deleted');
+      setDeleteTarget(null);
+      await fetchApplications();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to delete application');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteApplication = async (appId) => {
-    if (window.confirm('Are you sure you want to delete this application?')) {
-      try {
-        await deleteApplication(appId);
-        fetchApplications();
-      } catch (error) {
-        console.error('Failed to delete application:', error);
-        alert(error.response?.data?.error || 'Failed to delete application');
-      }
-    }
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredApplications.length / rowsPerPage));
+  const paginated = filteredApplications.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredApplications.length / rowsPerPage);
-  const paginatedApplications = filteredApplications.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const actions = (app) =>
+    isAdmin && (
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => openEdit(app)}>
+          Edit
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={() => setDeleteTarget(app)}
+        >
+          Delete
+        </Button>
+      </Stack>
+    );
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h1">Applications</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Typography variant="h4">Applications</Typography>
         {isAdmin && (
-        <Button 
-          variant="contained" 
-          startIcon={<AddIcon />}
-          onClick={handleOpenAddApplication}
-          sx={{ textTransform: 'none', borderRadius: 3, px: 3, py: 1 }}
-        >
-          Add Application
-        </Button> )}
+          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}>
+            Add application
+          </Button>
+        )}
       </Box>
 
-      {/* Add Application Dialog */}
-      <Dialog open={openAddApplication} onClose={handleCloseAddApplication}>
-        <DialogTitle sx={{ fontWeight: 600 }}>Add Application</DialogTitle>
+      <TextField
+        size="small"
+        placeholder="Search applications..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+        sx={{ mb: 2, width: { xs: '100%', sm: 320 } }}
+      />
+
+      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>{editing ? 'Edit application' : 'Add application'}</DialogTitle>
         <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 400, pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
               fullWidth
-              label="Application Name"
+              label="Application name"
               name="app_name"
-              value={newApplication.app_name}
-              onChange={handleInputChange}
+              value={form.app_name}
+              onChange={(e) => setForm({ ...form, app_name: e.target.value })}
               size="small"
             />
             <TextField
               fullWidth
               label="Description"
               name="description"
-              value={newApplication.description}
-              onChange={handleInputChange}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
               size="small"
             />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseAddApplication} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleAddApplication} sx={{ textTransform: 'none', borderRadius: 3, px: 3 }}>
-            Save
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button variant="contained" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Search and Filters */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          size="small"
-          placeholder="Search applications..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-          sx={{ width: 300 }}
-        />
-      </Box>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete application"
+        message={`Delete “${deleteTarget?.name}”? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={saving}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
 
-      {/* Applications Table */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                {/* <TableCell sx={{ fontWeight: 600 }}>ID</TableCell> */}
-                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedApplications.length === 0 ? (
+      {loading ? (
+        <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} height={56} />)}</Stack>
+      ) : filteredApplications.length === 0 ? (
+        <EmptyState title="No applications found" description="Try another search or add an application." />
+      ) : isMobile ? (
+        <Stack spacing={1.5}>
+          {paginated.map((app) => (
+            <Paper key={app.id} sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={600}>{app.name}</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {app.description || '—'}
+              </Typography>
+              {actions(app)}
+            </Paper>
+          ))}
+        </Stack>
+      ) : (
+        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    No applications found
-                  </TableCell>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Actions</TableCell>
                 </TableRow>
-              ) : (
-                paginatedApplications.map((app) => (
+              </TableHead>
+              <TableBody>
+                {paginated.map((app) => (
                   <TableRow key={app.id} hover>
-                    {/* <TableCell>{app.id}</TableCell> */}
                     <TableCell sx={{ fontWeight: 500 }}>{app.name}</TableCell>
-                    <TableCell>{app.description}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                      {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleEditApplication(app)}
-                          sx={{ textTransform: 'none', borderRadius: 3, px: 2 }}
-                        >
-                          Edit
-                        </Button> )}
-                        {isAdmin && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleDeleteApplication(app.id)}
-                          sx={{
-                            textTransform: 'none',
-                            borderRadius: 3,
-                            px: 2,
-                            color: 'error.main',
-                            borderColor: 'error.main',
-                            '&:hover': { borderColor: 'error.main' }
-                          }}
-                        >
-                          Delete
-                        </Button> )}
-                      </Box>
-                    </TableCell>
+                    <TableCell>{app.description || '—'}</TableCell>
+                    <TableCell>{actions(app)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={(e, newPage) => setPage(newPage)}
-          shape="rounded"
-        />
-      </Box>
+      {filteredApplications.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination count={totalPages} page={page} onChange={(e, p) => setPage(p)} shape="rounded" />
+        </Box>
+      )}
     </Box>
   );
 };

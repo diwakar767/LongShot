@@ -1,9 +1,8 @@
-// src/components/Sidebar.jsx
 import React, { useState } from 'react';
 import {
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Typography,
@@ -11,6 +10,7 @@ import {
   IconButton,
   Tooltip,
   useTheme,
+  Divider
 } from '@mui/material';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -24,130 +24,172 @@ import {
   Settings as SettingsIcon,
   Apps as AppsIcon,
   ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 
-const Sidebar = () => {
-  const [isExpanded, setIsExpanded] = useState(true);
+export const DRAWER_WIDTH = 240;
+export const DRAWER_WIDTH_COLLAPSED = 72;
+
+const navItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+  { text: 'Alerts', icon: <AlertsIcon />, path: '/alerts' },
+  { text: 'Servers', icon: <ServersIcon />, path: '/servers' },
+  { text: 'Reset requests', icon: <RequestsIcon />, path: '/requests' },
+  { text: 'Groups', icon: <GroupsIcon />, path: '/groups' },
+  { text: 'Users', icon: <UsersIcon />, path: '/users' },
+  { text: 'Audit', icon: <AuditIcon />, path: '/audit' },
+  { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  { text: 'Applications', icon: <AppsIcon />, path: '/applications' }
+];
+
+function NavList({ expanded, onNavigate }) {
   const theme = useTheme();
   const location = useLocation();
 
-  const navItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Alerts', icon: <AlertsIcon />, path: '/alerts' },
-    { text: 'Servers', icon: <ServersIcon />, path: '/servers' },
-    { text: 'Reset requests', icon: <RequestsIcon />, path: '/requests' },
-    { text: 'Groups', icon: <GroupsIcon />, path: '/groups' },
-    { text: 'Users', icon: <UsersIcon />, path: '/users' },
-    { text: 'Audit', icon: <AuditIcon />, path: '/audit' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-    { text: 'Applications', icon: <AppsIcon />, path: '/applications' },
-  ];
+  return (
+    <List sx={{ px: expanded ? 1.5 : 1, py: 1 }}>
+      {navItems.map((item) => {
+        const selected = location.pathname === item.path;
+        return (
+          <Tooltip key={item.text} title={expanded ? '' : item.text} placement="right">
+            <ListItemButton
+              component={Link}
+              to={item.path}
+              onClick={onNavigate}
+              selected={selected}
+              sx={{
+                borderRadius: 2,
+                mb: 0.5,
+                minHeight: 44,
+                justifyContent: expanded ? 'flex-start' : 'center',
+                px: expanded ? 1.5 : 1,
+                '&.Mui-selected': {
+                  bgcolor: 'primary.light',
+                  color: 'primary.dark',
+                  '& .MuiListItemIcon-root': { color: 'primary.main' }
+                },
+                '&.Mui-selected:hover': {
+                  bgcolor: 'primary.light'
+                }
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: expanded ? 40 : 0,
+                  mr: expanded ? 0 : 0,
+                  justifyContent: 'center',
+                  color: selected ? 'primary.main' : theme.palette.text.secondary
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              {expanded && <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: selected ? 600 : 500 }} />}
+            </ListItemButton>
+          </Tooltip>
+        );
+      })}
+    </List>
+  );
+}
 
-  const drawerWidth = isExpanded ? 240 : 64;
+/**
+ * Mobile: temporary drawer. Desktop: permanent, collapsible.
+ */
+export default function Sidebar({ mobileOpen, onMobileClose, isMdUp }) {
+  const theme = useTheme();
+  const [expanded, setExpanded] = useState(true);
+  const width = expanded ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED;
+
+  const brand = (
+    <Box
+      sx={{
+        p: expanded || !isMdUp ? 2.5 : 1.5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: expanded || !isMdUp ? 'flex-start' : 'center',
+        gap: 1.5
+      }}
+    >
+      <Box
+        component="img"
+        src="/AlertOn_logo.png"
+        alt="AlertOn"
+        sx={{ width: 28, height: 28, objectFit: 'contain' }}
+      />
+      {(expanded || !isMdUp) && (
+        <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main', letterSpacing: '-0.02em' }}>
+          AlertOn
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const desktopPaper = (
+    <>
+      {brand}
+      <Box sx={{ display: 'flex', justifyContent: expanded ? 'flex-end' : 'center', px: 1, pb: 1 }}>
+        <Tooltip title={expanded ? 'Collapse' : 'Expand'}>
+          <IconButton size="small" onClick={() => setExpanded((v) => !v)} aria-label="Toggle sidebar width">
+            {expanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <Divider />
+      <NavList expanded={expanded} />
+    </>
+  );
+
+  const mobilePaper = (
+    <>
+      {brand}
+      <Divider />
+      <NavList expanded onNavigate={onMobileClose} />
+    </>
+  );
+
+  if (!isMdUp) {
+    return (
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={onMobileClose}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          '& .MuiDrawer-paper': {
+            width: DRAWER_WIDTH,
+            boxSizing: 'border-box',
+            bgcolor: 'background.paper',
+            transition: theme.transitions.create('transform', {
+              easing: theme.transitions.easing.easeOut,
+              duration: theme.transitions.duration.enteringScreen
+            })
+          }
+        }}
+      >
+        {mobilePaper}
+      </Drawer>
+    );
+  }
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
+        width,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: drawerWidth,
+          width,
           boxSizing: 'border-box',
-          backgroundColor: theme.palette.background.paper,
-          color: theme.palette.text.primary,
-          boxShadow:
-            theme.palette.mode === 'light'
-              ? '0 8px 24px rgba(0, 0, 0, 0.08)'
-              : '0 8px 24px rgba(0, 0, 0, 0.2)',
+          bgcolor: 'background.paper',
           transition: theme.transitions.create('width', {
             easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.standard,
-          }),
-        },
+            duration: theme.transitions.duration.standard
+          })
+        }
       }}
+      open
     >
-      <Box
-        sx={{
-          p: isExpanded ? 3 : 2,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: isExpanded ? 'flex-start' : 'center',
-        }}
-      >
-        <Box
-          component="img"
-          src="/AlertOn_logo.png" // Make sure it's placed in the public folder
-          alt="AlertOn Logo"
-          sx={{
-            width: isExpanded ? 32 : 24,
-            height: isExpanded ? 32 : 24,
-            // bgcolor: 'primary.main',
-            borderRadius: theme.shape.borderRadius / 3,
-            mr: isExpanded ? 2 : 0,
-            transition: theme.transitions.create(['width', 'height'], {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.standard,
-            }),
-            objectFit: 'contain', // Keeps the aspect ratio
-            p: 0.5, // Optional: adds a little padding inside the circle
-          }}
-        />
-
-        {isExpanded && (
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 700, color: 'primary.main' }}
-          >
-            AlertOn
-          </Typography>
-        )}
-      </Box>
-      <Box sx={{ display: 'flex', justifyContent: isExpanded ? 'flex-end' : 'center', px: isExpanded ? 2 : 0 }}>
-        <Tooltip title={isExpanded ? 'Collapse Sidebar' : 'Expand Sidebar'}>
-          <IconButton onClick={() => setIsExpanded(!isExpanded)}>
-            {isExpanded ? <ChevronLeftIcon /> : <ChevronRightIcon />}
-          </IconButton>
-        </Tooltip>
-      </Box>
-      <List sx={{ px: isExpanded ? 2 : 1 }}>
-        {navItems.map((item) => (
-          <Tooltip key={item.text} title={isExpanded ? '' : item.text} placement="right">
-            <ListItem
-              button
-              component={Link}
-              to={item.path}
-              sx={{
-                borderRadius: theme.shape.borderRadius / 3,
-                mb: 0.5,
-                py: 0.5, // Reduced padding for tighter spacing
-                bgcolor: location.pathname === item.path ? 'primary.light' : 'transparent',
-                color: location.pathname === item.path ? 'primary.main' : theme.palette.text.primary,
-                '&:hover': {
-                  bgcolor: location.pathname === item.path ? 'primary.light' : theme.palette.action.hover,
-                },
-                transition: theme.transitions.create(['background-color', 'color'], {
-                  duration: theme.transitions.duration.short,
-                }),
-              }}
-            >
-              <ListItemIcon
-                sx={{
-                  color: location.pathname === item.path ? 'primary.main' : theme.palette.text.secondary,
-                  minWidth: isExpanded ? '40px' : 'auto',
-                  justifyContent: 'center', // Centered icons in both states
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              {isExpanded && <ListItemText primary={item.text} />}
-            </ListItem>
-          </Tooltip>
-        ))}
-      </List>
+      {desktopPaper}
     </Drawer>
   );
-};
-
-export default Sidebar;
+}

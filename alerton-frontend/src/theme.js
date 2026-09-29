@@ -1,153 +1,178 @@
-// src/theme.js
 import { createTheme } from '@mui/material/styles';
+import { keyframes } from '@emotion/react';
+
+/** Severity attention pulse — used for critical chips */
+export const severityPulse = keyframes`
+  0%, 100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(185, 28, 28, 0); }
+`;
 
 const lightPalette = {
   primary: {
-    main: '#4f46e5', // Vibrant indigo
-    light: '#e8e7ff',
+    main: '#0f766e',
+    light: '#ccfbf1',
+    dark: '#115e59',
+    contrastText: '#f8fafc'
   },
   secondary: {
-    main: '#9333ea', // Rich purple
+    main: '#334155',
+    light: '#e2e8f0'
   },
   critical: {
-    main: '#ef4444', // Bright red
-    light: 'rgba(239, 68, 68, 0.1)',
+    main: '#b91c1c',
+    light: 'rgba(185, 28, 28, 0.12)'
   },
   high: {
-    main: '#f97316', // Warm orange
-    light: 'rgba(249, 115, 22, 0.1)',
+    main: '#c2410c',
+    light: 'rgba(194, 65, 12, 0.12)'
   },
   medium: {
-    main: '#06b6d4', // Cool cyan
-    light: 'rgba(6, 182, 212, 0.1)',
+    main: '#0369a1',
+    light: 'rgba(3, 105, 161, 0.12)'
   },
   low: {
-    main: '#16a34a', // Positive green
-    light: 'rgba(22, 163, 74, 0.1)',
+    main: '#15803d',
+    light: 'rgba(21, 128, 61, 0.12)'
   },
   background: {
-    default: '#f8fafc', // Clean slate
-    paper: '#ffffff',
+    default: '#f1f5f9',
+    paper: '#ffffff'
   },
   text: {
-    primary: '#0f172a', // Deep slate
-    secondary: '#6b7280', // Warm gray
+    primary: '#0f172a',
+    secondary: '#64748b'
   },
+  divider: '#e2e8f0'
 };
 
 const darkPalette = {
   primary: {
-    main: '#6366f1', // Lively blue
-    light: '#2f3349', // Darker for contrast
+    main: '#2dd4bf',
+    light: '#134e4a',
+    dark: '#5eead4',
+    contrastText: '#042f2e'
   },
   secondary: {
-    main: '#a855f7', // Bright purple
+    main: '#94a3b8',
+    light: '#1e293b'
   },
   critical: {
-    main: '#f87171', // Softer red
-    light: 'rgba(248, 113, 113, 0.2)',
+    main: '#f87171',
+    light: 'rgba(248, 113, 113, 0.18)'
   },
   high: {
-    main: '#fb923c', // Warm orange
-    light: 'rgba(251, 146, 60, 0.2)',
+    main: '#fb923c',
+    light: 'rgba(251, 146, 60, 0.18)'
   },
   medium: {
-    main: '#22d3ee', // Cool cyan
-    light: 'rgba(34, 211, 238, 0.2)',
+    main: '#38bdf8',
+    light: 'rgba(56, 189, 248, 0.18)'
   },
   low: {
-    main: '#4ade80', // Bright green
-    light: 'rgba(74, 222, 128, 0.2)',
+    main: '#4ade80',
+    light: 'rgba(74, 222, 128, 0.18)'
   },
   background: {
-    default: '#0f172a', // Deep slate
-    paper: '#1e293b', // Soft gray
+    default: '#0b1220',
+    paper: '#111827'
   },
   text: {
-    primary: '#f1f5f9', // Bright white
-    secondary: '#9ca3af', // Muted gray
+    primary: '#e2e8f0',
+    secondary: '#94a3b8'
   },
+  divider: '#1f2937'
 };
 
 export const alertonTheme = (mode = 'light') =>
   createTheme({
     palette: {
       mode,
-      ...(mode === 'light' ? lightPalette : darkPalette),
+      ...(mode === 'light' ? lightPalette : darkPalette)
     },
     typography: {
-      fontFamily: '"Inter", sans-serif',
-      h1: {
-        fontSize: '28px',
-        fontWeight: 700,
-      },
-      h2: {
-        fontSize: '18px',
-        fontWeight: 600,
-      },
-      h4: {
-        fontSize: '24px',
-        fontWeight: 600,
-      },
-      body1: {
-        fontSize: '14px',
-      },
-      body2: {
-        fontSize: '12px',
-      },
+      fontFamily: '"DM Sans", "Segoe UI", sans-serif',
+      h1: { fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.02em' },
+      h2: { fontSize: '1.15rem', fontWeight: 600 },
+      h4: { fontSize: '1.35rem', fontWeight: 600, letterSpacing: '-0.01em' },
+      body1: { fontSize: '0.9375rem' },
+      body2: { fontSize: '0.8125rem' },
+      button: { textTransform: 'none', fontWeight: 600 }
     },
-    shape: {
-      borderRadius: 12,
+    shape: { borderRadius: 10 },
+    transitions: {
+      duration: {
+        shortest: 120,
+        shorter: 180,
+        short: 220,
+        standard: 280
+      }
     },
     components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            transition: 'background-color 0.25s ease, color 0.25s ease'
+          }
+        }
+      },
+      MuiButton: {
+        defaultProps: { disableElevation: true },
+        styleOverrides: {
+          root: { borderRadius: 8 }
+        }
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            backgroundImage: 'none',
+            boxShadow:
+              mode === 'light'
+                ? '0 1px 2px rgba(15, 23, 42, 0.06)'
+                : '0 1px 2px rgba(0, 0, 0, 0.35)'
+          }
+        }
+      },
       MuiCard: {
         styleOverrides: {
           root: {
-            boxShadow: mode === 'light' ? '0 8px 24px rgba(0, 0, 0, 0.08)' : '0 8px 24px rgba(0, 0, 0, 0.2)',
-            transition: 'transform 0.2s',
+            boxShadow:
+              mode === 'light'
+                ? '0 1px 2px rgba(15, 23, 42, 0.06)'
+                : '0 1px 2px rgba(0, 0, 0, 0.35)',
+            transition: 'border-color 0.2s ease, transform 0.2s ease',
+            border: '1px solid',
+            borderColor: mode === 'light' ? '#e2e8f0' : '#1f2937',
             '&:hover': {
-              transform: 'translateY(-4px)',
-            },
-          },
-        },
+              transform: 'none'
+            }
+          }
+        }
       },
       MuiChip: {
         styleOverrides: {
           root: {
             fontWeight: 600,
-            textTransform: 'capitalize',
-          },
-        },
+            textTransform: 'capitalize'
+          }
+        }
       },
-      MuiTable: {
+      MuiDrawer: {
         styleOverrides: {
-          root: {
-            borderCollapse: 'separate',
-            borderSpacing: '0 8px',
-          },
-        },
-      },
-      MuiTableRow: {
-        styleOverrides: {
-          root: {
-            '&.MuiTableRow-hover:hover': {
-              backgroundColor: mode === 'light' ? 'rgba(79, 70, 229, 0.04)' : 'rgba(99, 102, 241, 0.1)',
-            },
-          },
-        },
+          paper: {
+            borderRight: '1px solid',
+            borderColor: mode === 'light' ? '#e2e8f0' : '#1f2937',
+            boxShadow: 'none'
+          }
+        }
       },
       MuiTableCell: {
         styleOverrides: {
-          root: {
-            borderBottom: 'none',
-            padding: '12px 16px',
-          },
           head: {
-            backgroundColor: mode === 'light' ? '#f1f5f9' : '#334155',
-            color: mode === 'light' ? '#6b7280' : '#9ca3af',
-            fontWeight: 500,
-          },
-        },
-      },
-    },
+            backgroundColor: mode === 'light' ? '#f8fafc' : '#1e293b',
+            color: mode === 'light' ? '#64748b' : '#94a3b8',
+            fontWeight: 600
+          }
+        }
+      }
+    }
   });
