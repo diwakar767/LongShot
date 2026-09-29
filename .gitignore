@@ -1,0 +1,40 @@
+﻿# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+**/.env
+!/**/.env.example
+credentials.txt
+**/credentials.txt
+alerton-cli/config.local.yaml
+
+# Logs and runtime
+logs/
+*.log
+npm-debug.log*
+*.pid
+
+# Build / coverage
+build/
+dist/
+coverage/
+.cache/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Backups: keep folder marker only
+backups/**
+!backups/.gitkeep
+
+# Archives and local noise
+*.zip
+AlertON Application.pdf

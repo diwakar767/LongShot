@@ -1,0 +1,16 @@
+---
+description: LongShot project conventions for agents
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# LongShot agent rules
+
+- Read `docs/AIRULES.md`, `docs/SPRINTS.md`, and `docs/STATUS.md` before large changes.
+- Do not commit secrets (`.env`, credentials, DB dumps).
+- Keep alert ingest authenticated (`X-API-Key` or JWT).
+- Prefer Docker Compose for local stack; do not reintroduce VirtualBox as the primary path.
+- No AI-slop UI (purple glow, emoji clutter, pointless card grids).
+- Stay within the current sprint scope; update docs when behavior changes.
+- Prefer small diffs; avoid unrelated refactors.
