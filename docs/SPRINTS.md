@@ -4,8 +4,8 @@ Canonical decisions: **[ROADMAP.md](./ROADMAP.md)**.
 
 ```text
 SecureCore (done)
-  → BackendHardening          (next)
-  → UXMobileFirst             (mobile-first + animations + dynamic UX)
+  → BackendHardening          (done)
+  → UXMobileFirst             (next — mobile-first + animations + dynamic UX)
   → PermissionsAccess         (scoped alerts + access requests)
   → InAppNotifications        (free notify MVP)
   → MobileClient              (optional; same in-app model)
@@ -25,18 +25,14 @@ SecureCore (done)
 
 ---
 
-## Sprint Backend Hardening — Next
+## Sprint Backend Hardening — Done
 
-- Split `server.js` into routes/services  
-- Real migrations; stop prod `alter: true`  
-- Remove duplicate dead `GET /alerts`  
-- Tests: login, ingest API key, reset fulfill, change-password  
+- Split `server.js` into `app.js` + `routes/` + `middleware/` + `services/`  
+- Umzug migrations; removed `sequelize.sync({ alter: true })`  
+- Removed duplicate dead `GET /alerts` (kept joined formatter)  
+- Structured JSON logger; tests: login, ingest API key, reset fulfill, change-password  
 
-**Why before UX:** clean APIs/schema make notification + permission work safer.
-
----
-
-## Sprint UX — Mobile-first + dynamic + animations
+## Sprint UX — Mobile-first + dynamic + animations — Next
 
 **Goal:** Web app feels modern and usable on phones first; desktop remains solid.
 

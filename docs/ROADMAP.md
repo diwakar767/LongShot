@@ -47,6 +47,7 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 | Axios 401-only logout | Done |
 | Email OTP | Retired (410) |
 | E2E suite (31/31) | Done |
+| Maintainable backend (modules + migrations) | Done |
 
 ### Not done yet
 
@@ -65,8 +66,8 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 
 ```text
 SecureCore (done)
-  → BackendHardening
-  → UXMobileFirst (layout + animations + dynamic UX)
+  → BackendHardening (done)
+  → UXMobileFirst (layout + animations + dynamic UX) — next
   → Permissions+AccessRequests
   → InAppNotifications (MVP notify — free)
   → MobileClient (optional; same in-app model)
@@ -75,13 +76,13 @@ SecureCore (done)
 ### 1) Secure Core — Done
 Auth recovery without email/SMS; TOTP; session fixes.
 
-### 2) Backend Hardening — Next
+### 2) Backend Hardening — Done
 - Split `server.js` into routes/services  
 - Real migrations; drop prod reliance on `alter: true`  
 - Remove duplicate `GET /alerts`  
 - Tests: login, ingest key, reset fulfill, change-password  
 
-### 3) UX — Mobile-first + dynamic + animations
+### 3) UX — Mobile-first + dynamic + animations — Next
 - Responsive **mobile-first** shell (nav, tables → cards/lists on small screens)  
 - Replace `prompt`/`confirm`/`alert` with dialogs/snackbars  
 - Purposeful motion: list enter, severity emphasis, drawer/nav transitions (2–3 consistent patterns)  

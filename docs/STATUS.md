@@ -1,7 +1,7 @@
 ﻿# Project Status
 
 **Last updated:** 2026-09-29  
-**Active sprint next:** Backend Hardening  
+**Active sprint next:** UX Mobile-first + animations  
 **Remote:** https://github.com/diwakar767/LongShot.git  
 **Canonical plan:** [ROADMAP.md](./ROADMAP.md) · [SPRINTS.md](./SPRINTS.md)
 
@@ -19,7 +19,8 @@ Lab admin: `admin` / `admin123`
 
 - Phase 1 (Docker, env, API-key ingest, docs, DB migrate)  
 - Secure Core (reset requests, temp password, TOTP, logout-on-401-only)  
-- E2E **31/31 PASS**
+- E2E **31/31 PASS**  
+- **Backend Hardening** — modular routes/middleware/services, Umzug migrations (no `alter: true`), duplicate `GET /alerts` removed, structured logger, `npm test` (login / ingest / reset+change-password)
 
 ## Locked product decisions (see ROADMAP)
 
@@ -29,17 +30,21 @@ Lab admin: `admin` / `admin123`
 
 ## Sequence remaining
 
-1. **Backend Hardening**  
-2. **UX Mobile-first + animations**  
-3. **Permissions + access requests**  
-4. **In-app notifications**  
-5. **Mobile client** (optional)  
+1. **UX Mobile-first + animations**  
+2. **Permissions + access requests**  
+3. **In-app notifications**  
+4. **Mobile client** (optional)  
 
 ## Still not done
 
-- Backend modularization / migrations  
 - Mobile-first layout + motion  
 - Permission-scoped alerts  
 - Access-request workflow  
 - In-app notification center  
 - Optional mobile client  
+
+## Backend notes
+
+- Boot: `migrate.js` (Umzug) then `app.listen` — see `alerton-backend/server.js`  
+- Tests: from `alerton-backend`, with Compose Postgres up and `.env` loaded: `npm test`  
+- Fresh DBs get schema from `migrations/001-initial-schema.js`; existing volumes skip creates if `Users` already exists  

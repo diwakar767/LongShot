@@ -1,0 +1,13 @@
+# CLI defaults (lab). Prefer a local override: copy to `config.local.yaml` (gitignored)
+# or set ALERT_INGEST_API_KEY / --api-key.
+#
+# `api_key` MUST match root `.env` → ALERT_INGEST_API_KEY.
+
+url: "http://127.0.0.1:5000/alert"
+api_key: "change_me_ingest_api_key"
+message: "Default alert message"
+severity: "minor"
+server_name: "cli1-server"
+group_name: "techops"
+app_name: "monitor"
+country_name: "United States"

@@ -41,7 +41,8 @@ Then start backend/frontend (`docker compose up --build`) and confirm data in th
 
 ```bash
 cd alerton-cli
-# set api_key in config.yaml (same value as ALERT_INGEST_API_KEY)
+# Copy config.example.yaml → config.yaml (or config.local.yaml) and set api_key
+# to the same value as ALERT_INGEST_API_KEY in root .env
 node cli.js --message "Disk full" --severity major
 node cli.js --dry-run
 ```

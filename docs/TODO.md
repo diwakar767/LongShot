@@ -6,10 +6,10 @@ Priorities: P0 blocker · P1 next · P2 later. Tags map to [SPRINTS.md](./SPRINT
 |----|----------|--------|------|--------|
 | T-001–T-006 | P0 | Phase1 | Repo, docs, Docker, env, migrate, push | Done |
 | T-010–T-015 | P0 | SecureCore | Reset request, temp password, TOTP, axios | Done |
-| T-020 | P1 | BackendHardening | Split routes/services from `server.js` | Todo |
-| T-021 | P1 | BackendHardening | Real migrations; disable alter-sync in prod | Todo |
-| T-022 | P1 | BackendHardening | Structured logging + auth/ingest/reset tests | Todo |
-| T-023 | P0 | BackendHardening | Remove duplicate dead `GET /alerts` | Todo |
+| T-020 | P1 | BackendHardening | Split routes/services from `server.js` | Done |
+| T-021 | P1 | BackendHardening | Real migrations; disable alter-sync in prod | Done |
+| T-022 | P1 | BackendHardening | Structured logging + auth/ingest/reset tests | Done |
+| T-023 | P0 | BackendHardening | Remove duplicate dead `GET /alerts` | Done |
 | T-030 | P1 | UXMobileFirst | Mobile-first responsive shell | Todo |
 | T-031 | P1 | UXMobileFirst | Dialogs/snackbars; remove prompt/confirm/alert | Todo |
 | T-032 | P1 | UXMobileFirst | Animations (nav, lists, severity emphasis) | Todo |
