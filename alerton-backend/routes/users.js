@@ -68,16 +68,70 @@ router.post('/users', authenticateToken, requireAdmin, auditMiddleware, async (r
 });
 
 router.put('/users/:id', authenticateToken, requireAdmin, auditMiddleware, async (req, res) => {
-  const { username, email, is_admin } = req.body;
+  const { username, email, is_admin, is_active } = req.body;
   const user = await User.findByPk(req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   try {
-    await user.update({ username, email, is_admin });
-    await AuditLog.create({ user_id: req.user.user_id, action: 'update_user', details: { user_id: req.params.id } });
-    res.json(user);
+    const patch = { username, email, is_admin };
+    if (typeof is_active === 'boolean') {
+      if (Number(req.params.id) === Number(req.user.user_id) && is_active === false) {
+        return res.status(400).json({ error: 'Cannot lock your own account' });
+      }
+      patch.is_active = is_active;
+    }
+    await user.update(patch);
+    await AuditLog.create({
+      user_id: req.user.user_id,
+      action: 'update_user',
+      details: { user_id: req.params.id, is_active: patch.is_active }
+    });
+    const json = user.toJSON();
+    delete json.password_hash;
+    delete json.totp_secret;
+    delete json.otp_code;
+    res.json(json);
   } catch (error) {
     logger.error('update_user_error', { error: error.message });
     res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+router.post('/users/:id/lock', authenticateToken, requireAdmin, auditMiddleware, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    if (userId === Number(req.user.user_id)) {
+      return res.status(400).json({ error: 'Cannot lock your own account' });
+    }
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await user.update({ is_active: false });
+    await AuditLog.create({
+      user_id: req.user.user_id,
+      action: 'lock_user',
+      details: { user_id: userId }
+    });
+    res.json({ message: 'User locked', user_id: userId, is_active: false });
+  } catch (error) {
+    logger.error('lock_user_error', { error: error.message });
+    res.status(500).json({ error: 'Failed to lock user' });
+  }
+});
+
+router.post('/users/:id/unlock', authenticateToken, requireAdmin, auditMiddleware, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    await user.update({ is_active: true });
+    await AuditLog.create({
+      user_id: req.user.user_id,
+      action: 'unlock_user',
+      details: { user_id: userId }
+    });
+    res.json({ message: 'User unlocked', user_id: userId, is_active: true });
+  } catch (error) {
+    logger.error('unlock_user_error', { error: error.message });
+    res.status(500).json({ error: 'Failed to unlock user' });
   }
 });
 

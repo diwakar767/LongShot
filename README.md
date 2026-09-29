@@ -44,7 +44,11 @@ node cli.js --message "Disk full" --severity major
 node cli.js --agent                 # long-lived heartbeat + resolve flush
 ```
 
-See [docs/GUIDE_ENGINEER.md](docs/GUIDE_ENGINEER.md) for Windows service / always-on setup.
+See [docs/GUIDE_ENGINEER.md](docs/GUIDE_ENGINEER.md) for always-on setup:
+
+- **Linux:** `scripts/install-linux-service.sh` + `systemd/alerton-agent.service`
+- **Windows:** NSSM (`install-windows-service.ps1`) or Task Scheduler fallback
+
 
 ## Documentation
 

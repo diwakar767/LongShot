@@ -13,8 +13,8 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import GroupIcon from '@mui/icons-material/Group';
 import {
-  getUsers, createUser, updateUser, deleteUser, checkAdmin,
-  getGroups, assignUserGroup, removeUserGroup
+  getUsers, createUser, updateUser, deleteUser, checkAdmin, getCurrentUser,
+  getGroups, assignUserGroup, removeUserGroup, lockUser, unlockUser
 } from '../services/api';
 import { useFeedback } from '../context/FeedbackContext';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -33,6 +33,7 @@ const Users = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [usersData, setUsersData] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +59,9 @@ const Users = () => {
         username: user.username,
         email: user.email,
         is_admin: user.is_admin,
+        is_active: user.is_active !== false,
         tempPassword: false,
-        locked: false,
+        locked: user.is_active === false,
         groups: user.groups || []
       }));
       setUsersData(formattedUsers);
@@ -73,6 +75,9 @@ const Users = () => {
 
   useEffect(() => {
     checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
+    getCurrentUser()
+      .then((u) => setCurrentUserId(u.user_id ?? u.id ?? null))
+      .catch(() => {});
     fetchUsers();
     getGroups().then(setAllGroups).catch(() => {});
   }, []);
@@ -251,6 +256,28 @@ const Users = () => {
     }
   };
 
+  const handleToggleLock = async (user) => {
+    if (currentUserId != null && user.id === currentUserId) {
+      notifyError('Cannot lock your own account');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (user.locked) {
+        await unlockUser(user.id);
+        notifySuccess('User unlocked');
+      } else {
+        await lockUser(user.id);
+        notifySuccess('User locked');
+      }
+      await fetchUsers();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to update lock status');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(newUser.password);
     notifySuccess('Password copied');
@@ -264,6 +291,15 @@ const Users = () => {
       <Stack direction="row" spacing={1} flexWrap="wrap">
         <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => handleOpenEditUser(user)}>
           Edit
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color={user.locked ? 'success' : 'warning'}
+          disabled={saving || (currentUserId != null && user.id === currentUserId)}
+          onClick={() => handleToggleLock(user)}
+        >
+          {user.locked ? 'Unlock' : 'Lock'}
         </Button>
         <Button
           size="small"
@@ -519,12 +555,18 @@ const Users = () => {
                 {user.email}
               </Typography>
               <Box sx={{ mb: 1 }}>{groupChips(user)}</Box>
-              <Chip
-                size="small"
-                label={user.is_admin ? 'Admin' : 'User'}
-                color={user.is_admin ? 'primary' : 'default'}
-                sx={{ mb: 1.5 }}
-              />
+              <Stack direction="row" spacing={0.5} sx={{ mb: 1.5 }} flexWrap="wrap" useFlexGap>
+                <Chip
+                  size="small"
+                  label={user.is_admin ? 'Admin' : 'User'}
+                  color={user.is_admin ? 'primary' : 'default'}
+                />
+                <Chip
+                  size="small"
+                  label={user.locked ? 'Locked' : 'Active'}
+                  color={user.locked ? 'error' : 'success'}
+                />
+              </Stack>
               {actions(user)}
             </Paper>
           ))}
@@ -538,6 +580,7 @@ const Users = () => {
                   <TableCell>Username</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Admin</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Groups</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -552,6 +595,13 @@ const Users = () => {
                         label={user.is_admin ? 'Yes' : 'No'}
                         size="small"
                         color={user.is_admin ? 'primary' : 'default'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={user.locked ? 'Locked' : 'Active'}
+                        size="small"
+                        color={user.locked ? 'error' : 'success'}
                       />
                     </TableCell>
                     <TableCell>{groupChips(user)}</TableCell>

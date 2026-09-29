@@ -5,7 +5,7 @@
 - **Node.js 18+** only (Docker **not** required on the agent)
 - Network reachability to the AlertOn API (`url` in config)
 - A **Server** already created by an admin in the UI
-- That server’s unique **agent API key**
+- That server’s unique **agent API key** (shown once on create/rotate)
 
 ## Config
 
@@ -17,7 +17,7 @@ npm install
 
 ```yaml
 url: "http://YOUR_API_HOST:5000/alert"
-api_key: "<paste Agent key from Admin → Servers>"
+api_key: "<paste Agent key from Admin → Servers (shown once on create/rotate)>"
 server_name: "exact-server-name-from-ui"
 resolve_after_seconds: 300
 heartbeat_interval_seconds: 900
@@ -49,69 +49,113 @@ node cli.js --flush-resolves
 
 Local state file: `alert-state.json` next to `cli.js` (dedupe / resolve tracking).
 
-## Always-on on Windows (recommended)
+## What “self-heal” means here
 
-Run the agent as a background service so it survives logoff and restarts.
+| Layer | Behavior |
+|-------|----------|
+| **Inside `--agent`** | Each heartbeat/resolve tick is try/catch’d — a failed API call logs and the loop keeps running. |
+| **OS service** | If the Node process **exits** (crash, OOM, kill), the service manager starts it again. |
+| **Not covered** | Broken `api_key`, wrong `server_name`, or unreachable API — those need config/network fixes; the agent stays up and retries on the next tick. |
 
-### Option A — NSSM (simple)
+Install as a service so the process survives reboot and process death.
 
-1. Download [NSSM](https://nssm.cc/).
-2. From an elevated PowerShell:
+---
+
+## Always-on on Linux (systemd) — recommended
+
+Unit template: `systemd/alerton-agent.service`  
+Installer: `scripts/install-linux-service.sh`
+
+```bash
+cd /path/to/alerton-cli
+cp config.example.yaml config.yaml   # set url, server_name, api_key
+npm install
+chmod +x scripts/install-linux-service.sh
+sudo ./scripts/install-linux-service.sh
+# optional dedicated user:
+# sudo ./scripts/install-linux-service.sh --user alerton
+```
+
+What the installer does:
+
+- Writes `/etc/systemd/system/alerton-agent.service` with your real `node` path and CLI directory
+- Sets `Restart=always` / `RestartSec=5` (process crash → restart)
+- Enables and starts the unit
+- Appends stdout/stderr to `agent-stdout.log` / `agent-stderr.log` in the CLI dir (also in journald)
+
+Control:
+
+```bash
+systemctl status alerton-agent
+journalctl -u alerton-agent -f
+systemctl restart alerton-agent
+systemctl stop alerton-agent
+sudo ./scripts/install-linux-service.sh --uninstall
+```
+
+Manual install (same intent as the script):
+
+```bash
+sudo cp systemd/alerton-agent.service /etc/systemd/system/
+# edit WorkingDirectory, ExecStart, log paths
+sudo systemctl daemon-reload
+sudo systemctl enable --now alerton-agent
+```
+
+---
+
+## Always-on on Windows
+
+### Option A — NSSM (recommended)
+
+1. Download [NSSM](https://nssm.cc/) (use the `win64\nssm.exe` build).
+2. Elevated PowerShell:
 
 ```powershell
 cd E:\path\to\alerton-cli
-.\scripts\install-windows-service.ps1 -NssmPath "C:\tools\nssm\nssm.exe"
+.\scripts\install-windows-service.ps1 -NssmPath "C:\tools\nssm\win64\nssm.exe"
 ```
 
-Or manually:
+The script:
 
-```powershell
-nssm install AlertOnAgent "C:\Program Files\nodejs\node.exe" "E:\path\to\alerton-cli\cli.js" --agent
-nssm set AlertOnAgent AppDirectory "E:\path\to\alerton-cli"
-nssm set AlertOnAgent Start SERVICE_AUTO_START
-nssm start AlertOnAgent
-```
-
-Control:
+- Runs `node "<cli.js>" --agent` with **AppDirectory** = CLI folder (so `config.yaml` / `alert-state.json` resolve correctly)
+- **SERVICE_AUTO_START** — starts after reboot
+- **AppExit Default Restart** + **AppRestartDelay 5000** — restart on process exit (self-heal)
+- Rotating `agent-stdout.log` / `agent-stderr.log`
 
 ```powershell
 nssm restart AlertOnAgent
 nssm stop AlertOnAgent
-nssm remove AlertOnAgent confirm
+.\scripts\install-windows-service.ps1 -NssmPath "...\nssm.exe" -Uninstall
 ```
 
-NSSM restarts the process on crash (**auto-heal**).
-
-### Option B — Task Scheduler
+### Option B — Task Scheduler (fallback, no NSSM)
 
 ```powershell
 .\scripts\register-windows-task.ps1
 ```
 
-Creates a task that runs `node cli.js --agent` at startup and on failure retries.
+Runs `node cli.js --agent` at startup as **SYSTEM**, indefinite runtime, restarts on failure (up to 999 times / 1 min). Prefer NSSM when you can — its restart policy is simpler and continuous.
 
-### Logs
+### Windows cross-check (intent vs scripts)
 
-Redirect stdout/stderr via NSSM `AppStdout` / `AppStderr`, or wrap:
+| Intent | NSSM script | Task script |
+|--------|-------------|-------------|
+| Long-lived `--agent` | Yes (`AppParameters` … `--agent`) | Yes |
+| Correct working directory / config | `AppDirectory` = CLI dir | `-WorkingDirectory` |
+| Survive reboot | `SERVICE_AUTO_START` | `-AtStartup` |
+| Restart after crash | `AppExit Default Restart` + 5s delay | `RestartCount` / `RestartInterval` |
+| Survive logoff | Yes (service) | Yes (SYSTEM) |
+| Tick-level API errors | Handled inside CLI (loop continues) | Same |
 
-```powershell
-node cli.js --agent >> agent.log 2>&1
-```
+**Note:** Older NSSM install lines that passed `"cli.js" --agent` as a single install argument could mis-bind parameters; the current script sets **AppParameters** explicitly.
 
-## Linux (systemd sketch)
+---
 
-```ini
-# /etc/systemd/system/alerton-agent.service
-[Service]
-WorkingDirectory=/opt/alerton-cli
-ExecStart=/usr/bin/node cli.js --agent
-Restart=always
-RestartSec=5
-```
+## Logs
 
-```bash
-sudo systemctl enable --now alerton-agent
-```
+- Linux: `journalctl -u alerton-agent -f` and/or `agent-*.log` in the CLI directory  
+- Windows (NSSM): `agent-stdout.log` / `agent-stderr.log` in the CLI directory  
 
 ## Auth reminder
 

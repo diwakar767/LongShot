@@ -22,19 +22,25 @@ Empty inventory = agents cannot open alerts (unknown country/app/group/server).
 
 ### Per-server agent keys
 
-- Each server gets a unique ingest API key at creation.
-- **Agent key** — reveal current key for CLI `api_key`.
-- **Rotate key** — invalidates the old key; update the host config immediately.
+- Each server gets a unique ingest API key at creation (plaintext shown **once**).
+- Keys are stored as **SHA-256 hashes** — they cannot be revealed later.
+- **Agent key** — shows key prefix / status; if no key exists yet, mints one.
+- **Rotate key** — invalidates the old key and shows a new plaintext once; update the host config immediately.
+
+### Users — lock / unlock
+
+- **Lock** sets `is_active=false` so login fails; unlock restores access.
+- You cannot lock your own account.
 
 ## Day-to-day
 
 | Area | What you do |
 |------|-------------|
 | Dashboard | Active alerts; agents live `x/y` |
-| Alerts | Active / Resolved / All; clear resolved or clear all |
-| Servers | Live / Down / Unknown from heartbeats; retention; keys |
+| Alerts | Active / Resolved / All; server-paged list; clear resolved or clear all |
+| Servers | Live / Down / Unknown from heartbeats; retention; keys (hash-at-rest) |
 | Applications | Retention override (wins over server / global) |
-| Users / Groups | Membership and view permissions |
+| Users / Groups | Membership, view permissions, lock/unlock |
 | Access requests | Approve/reject group or server access |
 | Reset requests | Issue temp passwords (+ optional TOTP reset) |
 | Audit | Review admin actions |

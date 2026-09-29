@@ -146,7 +146,20 @@ const Servers = () => {
     setSaving(true);
     try {
       const data = await getServerIngestKey(server.id);
-      setKeyDialog({ name: data.name, ingest_api_key: data.ingest_api_key });
+      if (data.revealable && data.ingest_api_key) {
+        setKeyDialog({
+          name: data.name,
+          ingest_api_key: data.ingest_api_key,
+          prefix: data.ingest_api_key_prefix
+        });
+      } else {
+        setKeyDialog({
+          name: data.name,
+          ingest_api_key: null,
+          prefix: data.ingest_api_key_prefix || server.ingest_api_key_prefix,
+          note: data.note || 'Keys are hashed at rest. Rotate to mint a new key.'
+        });
+      }
     } catch (error) {
       notifyError(error.response?.data?.error || 'Failed to load ingest key');
     } finally {
@@ -158,8 +171,13 @@ const Servers = () => {
     setSaving(true);
     try {
       const data = await rotateServerIngestKey(server.id);
-      setKeyDialog({ name: data.name, ingest_api_key: data.ingest_api_key });
+      setKeyDialog({
+        name: data.name,
+        ingest_api_key: data.ingest_api_key,
+        prefix: data.ingest_api_key_prefix
+      });
       notifySuccess('Agent API key rotated — update CLI config on that host');
+      await fetchServers();
     } catch (error) {
       notifyError(error.response?.data?.error || 'Failed to rotate ingest key');
     } finally {
@@ -308,22 +326,38 @@ const Servers = () => {
       <Dialog open={!!keyDialog} onClose={() => setKeyDialog(null)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 600 }}>Agent API key — {keyDialog?.name}</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Put this key in the CLI <code>config.yaml</code> as <code>api_key</code> on that host only.
-            Each server has its own key.
-          </DialogContentText>
-          <TextField
-            fullWidth
-            multiline
-            minRows={2}
-            value={keyDialog?.ingest_api_key || ''}
-            InputProps={{ readOnly: true }}
-            size="small"
-          />
+          {keyDialog?.ingest_api_key ? (
+            <>
+              <DialogContentText sx={{ mb: 2 }}>
+                Copy this key into the CLI <code>config.yaml</code> as <code>api_key</code> on that host only.
+                It is shown once and stored hashed — it cannot be retrieved later.
+              </DialogContentText>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                value={keyDialog.ingest_api_key}
+                InputProps={{ readOnly: true }}
+                size="small"
+              />
+            </>
+          ) : (
+            <DialogContentText>
+              {keyDialog?.note || 'Keys are hashed at rest.'}
+              {keyDialog?.prefix ? (
+                <>
+                  {' '}Prefix: <code>{keyDialog.prefix}…</code>
+                </>
+              ) : null}
+              {' '}Use <strong>Rotate key</strong> to mint a new plaintext key.
+            </DialogContentText>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setKeyDialog(null)}>Close</Button>
-          <Button variant="contained" onClick={copyKey}>Copy</Button>
+          {keyDialog?.ingest_api_key && (
+            <Button variant="contained" onClick={copyKey}>Copy</Button>
+          )}
         </DialogActions>
       </Dialog>
 

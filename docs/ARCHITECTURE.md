@@ -42,8 +42,10 @@ docs/              Deploy + role guides
 
 ### Auth
 - UI: JWT (`JWT_SECRET`)
-- Ingest / resolve / heartbeat: **per-server** `ingest_api_key` via `X-API-Key`, or admin JWT for UI-created alerts
+- Ingest / resolve / heartbeat: **per-server** hashed `ingest_api_key` via `X-API-Key` (plaintext shown once on create/rotate), or admin JWT for UI-created alerts
 - Password change: short-lived change token; TOTP optional (Skip allowed)
+- Account lock: `User.is_active`; locked users cannot log in
+- Alerts list: optional `page` / `pageSize` (or `limit`) returns `{ items, total, page, pageSize, totalPages }`
 
 ### Retention
 `app.retention_days` → `server.retention_days` → `ALERT_RETENTION_DAYS` (default 30)

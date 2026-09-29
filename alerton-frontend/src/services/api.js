@@ -110,6 +110,16 @@ export const updateUser = async (userId, userData) => {
   return response.data;
 };
 
+export const lockUser = async (userId) => {
+  const response = await api.post(`/users/${userId}/lock`);
+  return response.data;
+};
+
+export const unlockUser = async (userId) => {
+  const response = await api.post(`/users/${userId}/unlock`);
+  return response.data;
+};
+
 export const deleteUser = async (userId) => {
   const response = await api.delete(`/users/${userId}`);
   return response.data;

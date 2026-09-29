@@ -22,7 +22,13 @@ router.get('/current-user', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.user_id);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ username: user.username });
+    res.json({
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      is_admin: user.is_admin,
+      is_active: user.is_active
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user' });
   }

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { Server } = require('../models/server');
+const { hashIngestApiKey } = require('../services/ingestKeys');
 const logger = require('../utils/logger');
 
 const SECRET_KEY = process.env.JWT_SECRET || process.env.SECRET_KEY;
@@ -34,7 +35,9 @@ const authenticateAlertIngest = async (req, res, next) => {
   try {
     const apiKey = req.headers['x-api-key'];
     if (apiKey) {
-      const server = await Server.findOne({ where: { ingest_api_key: apiKey } });
+      const server = await Server.findOne({
+        where: { ingest_api_key_hash: hashIngestApiKey(apiKey) }
+      });
       if (server) {
         if (server.is_active === false) {
           return res.status(403).json({ error: 'Server agent is inactive' });

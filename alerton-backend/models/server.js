@@ -9,7 +9,8 @@ const Server = sequelize.define('Server', {
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
   retention_days: { type: DataTypes.INTEGER, allowNull: true },
   agent_last_heartbeat_at: { type: DataTypes.DATE, allowNull: true },
-  ingest_api_key: { type: DataTypes.STRING(64), allowNull: true, unique: true }
+  ingest_api_key_hash: { type: DataTypes.STRING(64), allowNull: true, unique: true },
+  ingest_api_key_prefix: { type: DataTypes.STRING(16), allowNull: true }
 }, {
   indexes: [{ name: 'idx_servers_app', fields: ['app_id'] }]
 });

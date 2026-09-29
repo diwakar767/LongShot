@@ -32,8 +32,14 @@ const Alerts = () => {
   const [filters, setFilters] = useState({
     countries: [], apps: [], severities: [], groups: [], servers: [], search: ''
   });
+  const [facets, setFacets] = useState({
+    countries: [], apps: [], groups: [], servers: []
+  });
   const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const rowsPerPage = 10;
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [openAddAlert, setOpenAddAlert] = useState(false);
@@ -47,14 +53,40 @@ const Alerts = () => {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const params = statusView === 'all' ? {} : { status: statusView };
+      const params = {
+        page,
+        pageSize: rowsPerPage
+      };
+      if (statusView !== 'all') params.status = statusView;
+      if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
+      if (filters.severities.length) {
+        params.severity = filters.severities.map((s) => s.toLowerCase()).join(',');
+      }
+      if (filters.countries.length) params.country = filters.countries.join(',');
+      if (filters.apps.length) params.app = filters.apps.join(',');
+      if (filters.groups.length) params.group = filters.groups.join(',');
+      if (filters.servers.length) params.server = filters.servers.join(',');
+
       const data = await getAlerts(params);
-      setAlerts(
-        data.map((alert) => ({
-          ...alert,
-          severity: alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)
-        }))
-      );
+      const items = Array.isArray(data) ? data : data.items || [];
+      const mapped = items.map((alert) => ({
+        ...alert,
+        severity: alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1)
+      }));
+      setAlerts(mapped);
+      if (!Array.isArray(data)) {
+        setTotal(data.total ?? mapped.length);
+        setTotalPages(data.totalPages ?? Math.max(1, Math.ceil((data.total || 0) / rowsPerPage)));
+      } else {
+        setTotal(mapped.length);
+        setTotalPages(1);
+      }
+      setFacets((prev) => ({
+        countries: [...new Set([...prev.countries, ...mapped.map((a) => a.country)])].filter(Boolean).sort(),
+        apps: [...new Set([...prev.apps, ...mapped.map((a) => a.app)])].filter(Boolean).sort(),
+        groups: [...new Set([...prev.groups, ...mapped.map((a) => a.group)])].filter(Boolean).sort(),
+        servers: [...new Set([...prev.servers, ...mapped.map((a) => a.server)])].filter(Boolean).sort()
+      }));
     } catch (error) {
       notifyError(error.response?.data?.error || 'Failed to fetch alerts');
     } finally {
@@ -67,35 +99,24 @@ const Alerts = () => {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(filters.search), 300);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
     fetchAlerts();
     const timer = setInterval(fetchAlerts, 15000);
     return () => clearInterval(timer);
-  }, [statusView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusView, page, debouncedSearch, filters.countries, filters.apps, filters.severities, filters.groups, filters.servers]);
 
-  const allCountries = [...new Set(alerts.map((a) => a.country))].filter(Boolean);
-  const allApps = [...new Set(alerts.map((a) => a.app))].filter(Boolean);
+  const allCountries = facets.countries;
+  const allApps = facets.apps;
   const allSeverities = ['Critical', 'Major', 'Minor', 'Trivial'];
-  const allGroups = [...new Set(alerts.map((a) => a.group))].filter(Boolean);
-  const allServers = [...new Set(alerts.map((a) => a.server))].filter(Boolean);
+  const allGroups = facets.groups;
+  const allServers = facets.servers;
 
-  const filteredAlerts = alerts.filter((alert) => {
-    const countryMatch = filters.countries.length === 0 || filters.countries.includes(alert.country);
-    const appMatch = filters.apps.length === 0 || filters.apps.includes(alert.app);
-    const severityMatch = filters.severities.length === 0 || filters.severities.includes(alert.severity);
-    const groupMatch = filters.groups.length === 0 || filters.groups.includes(alert.group);
-    const serverMatch = filters.servers.length === 0 || filters.servers.includes(alert.server);
-    const q = filters.search.toLowerCase();
-    const searchMatch =
-      !q ||
-      [alert.message, alert.country, alert.app, alert.group, alert.server, alert.serverIp]
-        .join(' ')
-        .toLowerCase()
-        .includes(q);
-    return countryMatch && appMatch && severityMatch && groupMatch && serverMatch && searchMatch;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / rowsPerPage));
-  const paginatedAlerts = filteredAlerts.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  const paginatedAlerts = alerts;
 
   const handleFilterChange = (name, value) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -334,7 +355,7 @@ const Alerts = () => {
 
       {loading ? (
         <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} height={64} />)}</Stack>
-      ) : filteredAlerts.length === 0 ? (
+      ) : alerts.length === 0 ? (
         <EmptyState title="No alerts found" description="Adjust filters or create an alert." />
       ) : isMobile ? (
         <Stack spacing={1.5}>
@@ -451,7 +472,7 @@ const Alerts = () => {
         </Paper>
       )}
 
-      {filteredAlerts.length > 0 && (
+      {total > 0 && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
           <Pagination count={totalPages} page={page} onChange={(e, p) => setPage(p)} shape="rounded" />
         </Box>

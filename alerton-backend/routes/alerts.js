@@ -1,4 +1,5 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const { Country } = require('../models/country');
 const { Application } = require('../models/application');
 const { Server } = require('../models/server');
@@ -39,6 +40,14 @@ function formatAlert(alert) {
   };
 }
 
+function parseCsv(value) {
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 router.get('/alerts', authenticateToken, async (req, res) => {
   try {
     const scopeWhere = await buildAlertScopeWhere(req.user);
@@ -48,17 +57,85 @@ router.get('/alerts', authenticateToken, async (req, res) => {
       where.status = statusFilter;
     }
 
-    const alerts = await Alert.findAll({
+    const severities = parseCsv(req.query.severity).map((s) => s.toLowerCase());
+    if (severities.length) {
+      where.severity = { [Op.in]: severities };
+    }
+
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (q) {
+      where.message = { [Op.iLike]: `%${q}%` };
+    }
+
+    const countries = parseCsv(req.query.country);
+    const servers = parseCsv(req.query.server);
+    const apps = parseCsv(req.query.app);
+    const groups = parseCsv(req.query.group);
+
+    const include = [
+      {
+        model: Server,
+        attributes: ['server_name', 'ip_address'],
+        where: servers.length ? { server_name: { [Op.in]: servers } } : undefined,
+        required: servers.length > 0
+      },
+      {
+        model: UserGroup,
+        attributes: ['group_name'],
+        where: groups.length ? { group_name: { [Op.in]: groups } } : undefined,
+        required: groups.length > 0
+      },
+      {
+        model: Application,
+        attributes: ['app_name'],
+        where: apps.length ? { app_name: { [Op.in]: apps } } : undefined,
+        required: apps.length > 0
+      },
+      {
+        model: Country,
+        attributes: ['country_name'],
+        where: countries.length ? { country_name: { [Op.in]: countries } } : undefined,
+        required: countries.length > 0
+      }
+    ];
+
+    const wantsPagination =
+      req.query.page !== undefined ||
+      req.query.pageSize !== undefined ||
+      req.query.limit !== undefined;
+
+    if (!wantsPagination) {
+      const alerts = await Alert.findAll({
+        where: Object.keys(where).length ? where : undefined,
+        include,
+        order: [['updatedAt', 'DESC']]
+      });
+      return res.json(alerts.map(formatAlert));
+    }
+
+    const page = Math.max(1, parseInt(req.query.page || '1', 10) || 1);
+    const pageSize = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.pageSize || req.query.limit || '25', 10) || 25)
+    );
+    const offset = (page - 1) * pageSize;
+
+    const { count, rows } = await Alert.findAndCountAll({
       where: Object.keys(where).length ? where : undefined,
-      include: [
-        { model: Server, attributes: ['server_name', 'ip_address'] },
-        { model: UserGroup, attributes: ['group_name'] },
-        { model: Application, attributes: ['app_name'] },
-        { model: Country, attributes: ['country_name'] }
-      ],
-      order: [['updatedAt', 'DESC']]
+      include,
+      order: [['updatedAt', 'DESC']],
+      limit: pageSize,
+      offset,
+      distinct: true
     });
-    res.json(alerts.map(formatAlert));
+
+    res.json({
+      items: rows.map(formatAlert),
+      page,
+      pageSize,
+      total: count,
+      totalPages: Math.max(1, Math.ceil(count / pageSize))
+    });
   } catch (error) {
     logger.error('fetch_alerts_error', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch alerts' });

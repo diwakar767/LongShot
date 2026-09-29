@@ -65,7 +65,7 @@ async function ensureIngestFixture(app, adminToken) {
   }
 
   const keyRes = await request(app)
-    .get(`/servers/${target.id}/ingest-key`)
+    .post(`/servers/${target.id}/rotate-ingest-key`)
     .set('Authorization', `Bearer ${adminToken}`);
   assert.equal(keyRes.status, 200);
   assert.ok(keyRes.body.ingest_api_key);
