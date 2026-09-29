@@ -17,11 +17,14 @@ function createApp() {
   app.use(require('./routes/auth'));
   app.use(require('./routes/passwordReset'));
   app.use(require('./routes/alerts'));
+  app.use(require('./routes/agents'));
   app.use(require('./routes/audit'));
   app.use(require('./routes/dashboard'));
   app.use(require('./routes/users'));
   app.use(require('./routes/permissions'));
   app.use(require('./routes/accessRequests'));
+  app.use(require('./routes/notifications'));
+  app.use(require('./routes/notificationPrefs'));
   app.use(require('./routes/groups'));
   app.use(require('./routes/servers'));
   app.use(require('./routes/countries'));

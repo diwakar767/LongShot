@@ -1,7 +1,7 @@
 ﻿# Project Status
 
 **Last updated:** 2026-09-29  
-**Active sprint next:** In-app notifications  
+**Active sprint next:** Mobile client (optional)  
 **Remote:** https://github.com/diwakar767/LongShot.git  
 **Canonical plan:** [ROADMAP.md](./ROADMAP.md) · [SPRINTS.md](./SPRINTS.md)
 
@@ -17,21 +17,24 @@ Lab admin: `admin` / `admin123`
 
 ## Completed
 
-- Phase 1 · Secure Core · Backend Hardening · UX Mobile-first  
-- **Permissions + access requests** — scoped `GET /alerts` (admin=all; else group membership + `UserPermission`); `AccessRequest` API/UI (`/access`); Users group assign/remove  
+- Phase 1 · Secure Core · Backend Hardening · UX Mobile-first · Permissions + access  
+- **In-app notifications** — `Notification` + prefs APIs; fan-out on ingest (scope + severity); navbar bell/panel; Settings prefs persisted server-side  
+- **Alarm lifecycle + retention** — fingerprint open/reassert/resolve; CLI `alert-state.json` + `resolve_after_seconds`; per-server/app retention in admin UI; Active/Resolved alerts  
+- **Agent heartbeat** — 15m interval / 30m stale; dashboard `x/y` agents live; Servers Live/Down coloring  
 
 ## Locked product decisions (see ROADMAP)
 
-- Notifications = **in-app** (free)  
+- Notifications = **in-app** (free); no email/SMS/FCM required  
 - UI = mobile-first + purposeful motion  
-- No email/SMS for auth; no paid push required for MVP  
+- Fingerprint = sha256(severity|server|app|group|normalized message)  
+- CLI state beside binary; N quiet seconds per deployment config  
+- Retention days editable on Servers / Applications  
+- CLI ingest auth = shared `X-API-Key` (`ALERT_INGEST_API_KEY`); proves possession of the ingest secret, not cryptographic binding of `server_name` to a host (see README / STATUS)  
 
 ## Sequence remaining
 
-1. **In-app notifications**  
-2. **Mobile client** (optional)  
+1. **Mobile client** (optional)  
 
 ## Still not done
 
-- In-app notification center (bell)  
-- Optional mobile client  
+- Optional dedicated mobile client (same notification APIs)  

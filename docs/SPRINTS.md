@@ -7,7 +7,8 @@ SecureCore (done)
   → BackendHardening          (done)
   → UXMobileFirst             (done)
   → PermissionsAccess         (done)
-  → InAppNotifications        (next — free notify MVP)
+  → InAppNotifications        (done)
+  → AlarmLifecycle            (done)
   → MobileClient              (optional; same in-app model)
 ```
 
@@ -46,19 +47,19 @@ SecureCore (done)
 - Group/server **access requests** API + `/access` UI (separate from password-reset Requests)  
 - Admin approve/reject; Users UI group assignment  
 
-## Sprint In-App Notifications (free) — Next
+## Sprint In-App Notifications (free) — Done
 
-**Goal:** Users learn about new alerts without email/SMS/paid push.
+- Notification entity + APIs (list, unread count, mark read / read-all)  
+- Create notifications on ingest for eligible users (scope + `notify_prefs`)  
+- Bell + panel UI (popover desktop / bottom drawer mobile)  
+- Settings severity toggles persisted server-side  
 
-- Notification entity + APIs (list, unread count, mark read)  
-- Create notifications on ingest for eligible users (respect severity prefs)  
-- Bell + panel UI (mobile-first)  
-- Settings severity toggles drive what notifies  
-- Same contract later used by optional mobile client  
+## Sprint Alarm Lifecycle + Retention — Done
 
-**Explicitly out:** Twilio, mandatory FCM, paid transactional email.
-
----
+- CLI: fingerprint state file beside binary; dedupe; `resolve_after_seconds` (N) → resolve API  
+- Backend: active/resolved alerts; retention_days on servers & apps; prune resolved  
+- UI: Active/Resolved on Alerts; retention fields on Servers/Applications  
+- Agent heartbeat (15m interval, down after 30m): `POST /agent/heartbeat`; dashboard `x/y` live; Servers Live/Down colors  
 
 ## Sprint Mobile Client — Optional
 

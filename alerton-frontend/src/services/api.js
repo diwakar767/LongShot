@@ -140,13 +140,18 @@ export const deleteGroup = async (groupId) => {
   return response.data;
 };
 
-export const getAlerts = async () => {
-  const response = await api.get('/alerts');
+export const getAlerts = async (params = {}) => {
+  const response = await api.get('/alerts', { params });
   return response.data;
 };
 
 export const createAlert = async (alertData) => {
   const response = await api.post('/alert', alertData);
+  return response.data;
+};
+
+export const clearAlerts = async (scope = 'resolved') => {
+  const response = await api.delete('/alerts', { params: { scope } });
   return response.data;
 };
 
@@ -242,6 +247,36 @@ export const approveAccessRequest = async (id, notes) => {
 
 export const rejectAccessRequest = async (id, notes) => {
   const response = await api.post(`/access-requests/${id}/reject`, { notes });
+  return response.data;
+};
+
+export const getNotifications = async (params = {}) => {
+  const response = await api.get('/notifications', { params });
+  return response.data;
+};
+
+export const getUnreadNotificationCount = async () => {
+  const response = await api.get('/notifications/unread-count');
+  return response.data;
+};
+
+export const markNotificationRead = async (id) => {
+  const response = await api.post(`/notifications/${id}/read`);
+  return response.data;
+};
+
+export const markAllNotificationsRead = async () => {
+  const response = await api.post('/notifications/read-all');
+  return response.data;
+};
+
+export const getNotificationPrefs = async () => {
+  const response = await api.get('/notification-prefs');
+  return response.data;
+};
+
+export const updateNotificationPrefs = async (prefs) => {
+  const response = await api.put('/notification-prefs', prefs);
   return response.data;
 };
 

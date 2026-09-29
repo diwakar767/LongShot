@@ -18,10 +18,16 @@ Priorities: P0 blocker · P1 next · P2 later. Tags map to [SPRINTS.md](./SPRINT
 | T-050 | P1 | PermissionsAccess | Wire permission-scoped alerts | Done |
 | T-051 | P1 | PermissionsAccess | Group/server access request API + UI | Done |
 | T-052 | P2 | PermissionsAccess | Users UI: real group assignment | Done |
-| T-040 | P1 | InAppNotifications | Notification model + list/unread/mark-read APIs | Todo |
-| T-041 | P1 | InAppNotifications | Create notifications on alert ingest | Todo |
-| T-042 | P1 | InAppNotifications | Bell + panel UI (mobile-first) | Todo |
-| T-043 | P1 | InAppNotifications | Severity prefs in Settings drive notify | Todo |
+| T-040 | P1 | InAppNotifications | Notification model + list/unread/mark-read APIs | Done |
+| T-041 | P1 | InAppNotifications | Create notifications on alert ingest | Done |
+| T-042 | P1 | InAppNotifications | Bell + panel UI (mobile-first) | Done |
+| T-043 | P1 | InAppNotifications | Severity prefs in Settings drive notify | Done |
+| T-070 | P1 | AlarmLifecycle | CLI fingerprint state, dedupe, resolve_after_seconds | Done |
+| T-071 | P1 | AlarmLifecycle | Backend active/resolved + resolve API | Done |
+| T-072 | P1 | AlarmLifecycle | Retention days on server/app + cleanup | Done |
+| T-073 | P1 | AlarmLifecycle | Alerts UI status; admin retention fields | Done |
+| T-074 | P1 | AlarmLifecycle | CLI agent heartbeat + dashboard live/down | Done |
+| T-075 | P1 | AlarmLifecycle | Admin clear alerts from GUI | Done |
 | T-060 | P2 | MobileClient | Optional client using same APIs + in-app inbox | Todo |
 
 **Dropped / superseded:** paid email notify as primary path; mandatory FCM for MVP.

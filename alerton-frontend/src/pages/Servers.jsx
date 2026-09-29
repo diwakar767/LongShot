@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle,
-  DialogContent, DialogActions, MenuItem, Skeleton, Stack, useMediaQuery, useTheme
+  DialogContent, DialogActions, MenuItem, Skeleton, Stack, Chip, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,7 +13,7 @@ import { useFeedback } from '../context/FeedbackContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 
-const emptyForm = { server_name: '', ip_address: '', country_name: '' };
+const emptyForm = { server_name: '', ip_address: '', country_name: '', retention_days: '' };
 
 const Servers = () => {
   const theme = useTheme();
@@ -59,7 +59,21 @@ const Servers = () => {
     checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
     fetchServers();
     fetchCountries();
+    const timer = setInterval(fetchServers, 15000);
+    return () => clearInterval(timer);
   }, []);
+
+  const agentChip = (status) => {
+    if (status === 'live') return <Chip size="small" color="success" label="Live" />;
+    if (status === 'down') return <Chip size="small" color="error" label="Down" />;
+    return <Chip size="small" variant="outlined" label="Unknown" />;
+  };
+
+  const rowTone = (status) => {
+    if (status === 'live') return { borderLeft: '4px solid', borderLeftColor: 'success.main' };
+    if (status === 'down') return { borderLeft: '4px solid', borderLeftColor: 'error.main' };
+    return { borderLeft: '4px solid', borderLeftColor: 'divider' };
+  };
 
   useEffect(() => {
     const q = searchQuery.toLowerCase();
@@ -85,7 +99,8 @@ const Servers = () => {
     setForm({
       server_name: server.name || '',
       ip_address: server.ip || '',
-      country_name: server.country || ''
+      country_name: server.country || '',
+      retention_days: server.retention_days != null ? String(server.retention_days) : ''
     });
     setDialogOpen(true);
   };
@@ -95,13 +110,17 @@ const Servers = () => {
       notifyError('Server name, IP address, and country are required');
       return;
     }
+    const payload = {
+      ...form,
+      retention_days: form.retention_days === '' ? null : Number(form.retention_days)
+    };
     setSaving(true);
     try {
       if (editing) {
-        await updateServer(editing.id, form);
+        await updateServer(editing.id, payload);
         notifySuccess('Server updated');
       } else {
-        await createServer(form);
+        await createServer(payload);
         notifySuccess('Server created');
       }
       setDialogOpen(false);
@@ -204,6 +223,17 @@ const Servers = () => {
                 </MenuItem>
               ))}
             </TextField>
+            <TextField
+              fullWidth
+              type="number"
+              label="Resolved alert retention (days)"
+              name="retention_days"
+              value={form.retention_days}
+              onChange={(e) => setForm({ ...form, retention_days: e.target.value })}
+              size="small"
+              helperText="Leave empty to use application or global default"
+              inputProps={{ min: 1, step: 1 }}
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -231,11 +261,17 @@ const Servers = () => {
       ) : isMobile ? (
         <Stack spacing={1.5}>
           {paginated.map((server) => (
-            <Paper key={server.id} sx={{ p: 2, borderRadius: 2 }}>
-              <Typography fontWeight={600}>{server.name}</Typography>
+            <Paper key={server.id} sx={{ p: 2, borderRadius: 2, ...rowTone(server.agent_status) }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
+                <Typography fontWeight={600}>{server.name}</Typography>
+                {agentChip(server.agent_status)}
+              </Box>
               <Typography variant="body2" color="text.secondary">{server.ip}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              <Typography variant="body2" color="text.secondary">
                 {server.country || '—'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Retention: {server.retention_days != null ? `${server.retention_days}d` : 'default'}
               </Typography>
               {actions(server)}
             </Paper>
@@ -248,17 +284,30 @@ const Servers = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
+                  <TableCell>Agent</TableCell>
                   <TableCell>IP address</TableCell>
                   <TableCell>Country</TableCell>
+                  <TableCell>Retention</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginated.map((server) => (
-                  <TableRow key={server.id} hover>
+                  <TableRow
+                    key={server.id}
+                    hover
+                    sx={{
+                      ...rowTone(server.agent_status),
+                      bgcolor: server.agent_status === 'down' ? 'rgba(198, 40, 40, 0.06)' : undefined
+                    }}
+                  >
                     <TableCell sx={{ fontWeight: 500 }}>{server.name}</TableCell>
+                    <TableCell>{agentChip(server.agent_status)}</TableCell>
                     <TableCell>{server.ip}</TableCell>
                     <TableCell>{server.country}</TableCell>
+                    <TableCell>
+                      {server.retention_days != null ? `${server.retention_days} days` : 'Default'}
+                    </TableCell>
                     <TableCell>{actions(server)}</TableCell>
                   </TableRow>
                 ))}

@@ -10,7 +10,9 @@ node_modules/
 !/**/.env.example
 credentials.txt
 **/credentials.txt
+alerton-cli/config.yaml
 alerton-cli/config.local.yaml
+alerton-cli/alert-state.json
 
 # Logs and runtime
 logs/
@@ -31,10 +33,13 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# Backups: keep folder marker only
+# Local backups / dumps (folder kept via .gitkeep only)
 backups/**
 !backups/.gitkeep
+*.dump
+*.sql.gz
 
 # Archives and local noise
 *.zip
+*.pdf
 AlertON Application.pdf

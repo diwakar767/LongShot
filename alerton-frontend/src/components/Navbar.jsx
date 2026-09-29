@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { logout } from '../utils/auth';
 import { getCurrentUser } from '../services/api';
 import ThemeToggle from './ThemeToggle';
+import NotificationBell from './NotificationBell';
 
 const Navbar = ({ onMenuClick, showMenu = false }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -85,6 +86,7 @@ const Navbar = ({ onMenuClick, showMenu = false }) => {
         </Typography>
         <Box sx={{ flexGrow: { xs: 0, md: 1 } }} />
         <ThemeToggle />
+        {!loading && <NotificationBell />}
         {loading ? (
           <Skeleton variant="circular" width={36} height={36} />
         ) : (

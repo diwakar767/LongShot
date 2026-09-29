@@ -13,7 +13,7 @@ import { useFeedback } from '../context/FeedbackContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 
-const emptyForm = { app_name: '', description: '' };
+const emptyForm = { app_name: '', description: '', retention_days: '' };
 
 const Applications = () => {
   const theme = useTheme();
@@ -70,7 +70,11 @@ const Applications = () => {
 
   const openEdit = (app) => {
     setEditing(app);
-    setForm({ app_name: app.name || '', description: app.description || '' });
+    setForm({
+      app_name: app.name || '',
+      description: app.description || '',
+      retention_days: app.retention_days != null ? String(app.retention_days) : ''
+    });
     setDialogOpen(true);
   };
 
@@ -79,13 +83,17 @@ const Applications = () => {
       notifyError('Application name is required');
       return;
     }
+    const payload = {
+      ...form,
+      retention_days: form.retention_days === '' ? null : Number(form.retention_days)
+    };
     setSaving(true);
     try {
       if (editing) {
-        await updateApplication(editing.id, form);
+        await updateApplication(editing.id, payload);
         notifySuccess('Application updated');
       } else {
-        await createApplication(form);
+        await createApplication(payload);
         notifySuccess('Application created');
       }
       setDialogOpen(false);
@@ -173,6 +181,17 @@ const Applications = () => {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               size="small"
             />
+            <TextField
+              fullWidth
+              type="number"
+              label="Resolved alert retention (days)"
+              name="retention_days"
+              value={form.retention_days}
+              onChange={(e) => setForm({ ...form, retention_days: e.target.value })}
+              size="small"
+              helperText="Overrides server retention when set; leave empty for server/global default"
+              inputProps={{ min: 1, step: 1 }}
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -202,8 +221,11 @@ const Applications = () => {
           {paginated.map((app) => (
             <Paper key={app.id} sx={{ p: 2, borderRadius: 2 }}>
               <Typography fontWeight={600}>{app.name}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              <Typography variant="body2" color="text.secondary">
                 {app.description || '—'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Retention: {app.retention_days != null ? `${app.retention_days}d` : 'default'}
               </Typography>
               {actions(app)}
             </Paper>
@@ -217,6 +239,7 @@ const Applications = () => {
                 <TableRow>
                   <TableCell>Name</TableCell>
                   <TableCell>Description</TableCell>
+                  <TableCell>Retention</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -225,6 +248,9 @@ const Applications = () => {
                   <TableRow key={app.id} hover>
                     <TableCell sx={{ fontWeight: 500 }}>{app.name}</TableCell>
                     <TableCell>{app.description || '—'}</TableCell>
+                    <TableCell>
+                      {app.retention_days != null ? `${app.retention_days} days` : 'Default'}
+                    </TableCell>
                     <TableCell>{actions(app)}</TableCell>
                   </TableRow>
                 ))}

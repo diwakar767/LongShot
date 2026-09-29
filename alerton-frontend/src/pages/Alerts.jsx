@@ -3,17 +3,20 @@ import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, TextField, InputAdornment, Pagination, MenuItem, FormControl,
   Select, Grid, Button, Checkbox, ListItemText, InputLabel, IconButton, Dialog,
-  DialogTitle, DialogContent, DialogActions, Skeleton, Stack, useMediaQuery, useTheme
+  DialogTitle, DialogContent, DialogActions, Skeleton, Stack, Chip, ToggleButton,
+  ToggleButtonGroup, useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import ClearIcon from '@mui/icons-material/Clear';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
-import { getAlerts, createAlert, checkAdmin } from '../services/api';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import { getAlerts, createAlert, clearAlerts, checkAdmin } from '../services/api';
 import { useFeedback } from '../context/FeedbackContext';
 import EmptyState from '../components/EmptyState';
 import SeverityChip from '../components/SeverityChip';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const MenuProps = {
   PaperProps: { style: { maxHeight: 48 * 4.5 + 8, width: 250 } }
@@ -25,6 +28,7 @@ const Alerts = () => {
   const { notifyError, notifySuccess } = useFeedback();
   const [isAdmin, setIsAdmin] = useState(false);
   const [alerts, setAlerts] = useState([]);
+  const [statusView, setStatusView] = useState('active');
   const [filters, setFilters] = useState({
     countries: [], apps: [], severities: [], groups: [], servers: [], search: ''
   });
@@ -38,11 +42,13 @@ const Alerts = () => {
   });
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState('');
+  const [clearScope, setClearScope] = useState(null); // 'resolved' | 'all'
 
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const data = await getAlerts();
+      const params = statusView === 'all' ? {} : { status: statusView };
+      const data = await getAlerts(params);
       setAlerts(
         data.map((alert) => ({
           ...alert,
@@ -58,8 +64,13 @@ const Alerts = () => {
 
   useEffect(() => {
     checkAdmin().then(() => setIsAdmin(true)).catch(() => setIsAdmin(false));
-    fetchAlerts();
   }, []);
+
+  useEffect(() => {
+    fetchAlerts();
+    const timer = setInterval(fetchAlerts, 15000);
+    return () => clearInterval(timer);
+  }, [statusView]);
 
   const allCountries = [...new Set(alerts.map((a) => a.country))].filter(Boolean);
   const allApps = [...new Set(alerts.map((a) => a.app))].filter(Boolean);
@@ -117,6 +128,25 @@ const Alerts = () => {
     }
   };
 
+  const handleClearAlerts = async () => {
+    if (!clearScope) return;
+    setSaving(true);
+    try {
+      const result = await clearAlerts(clearScope);
+      notifySuccess(
+        clearScope === 'all'
+          ? `Cleared ${result.deleted} alert(s)`
+          : `Cleared ${result.deleted} resolved alert(s)`
+      );
+      setClearScope(null);
+      await fetchAlerts();
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to clear alerts');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const trimMessage = (message) => (message.length > 40 ? `${message.slice(0, 40)}…` : message);
   const formatTs = (ts) =>
     new Date(ts).toLocaleString('en-US', {
@@ -152,12 +182,61 @@ const Alerts = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
         <Typography variant="h4">Alerts</Typography>
-        {isAdmin && (
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenAddAlert(true)}>
-            Add alert
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={statusView}
+            onChange={(_, v) => {
+              if (v) {
+                setStatusView(v);
+                setPage(1);
+              }
+            }}
+          >
+            <ToggleButton value="active">Active</ToggleButton>
+            <ToggleButton value="resolved">Resolved</ToggleButton>
+            <ToggleButton value="all">All</ToggleButton>
+          </ToggleButtonGroup>
+          {isAdmin && (
+            <>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<DeleteSweepIcon />}
+                onClick={() => setClearScope('resolved')}
+              >
+                Clear resolved
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteSweepIcon />}
+                onClick={() => setClearScope('all')}
+              >
+                Clear all
+              </Button>
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenAddAlert(true)}>
+                Add alert
+              </Button>
+            </>
+          )}
+        </Box>
       </Box>
+
+      <ConfirmDialog
+        open={!!clearScope}
+        title={clearScope === 'all' ? 'Clear all alerts' : 'Clear resolved alerts'}
+        message={
+          clearScope === 'all'
+            ? 'Permanently delete all stored alerts (active and resolved) and their notifications? This cannot be undone.'
+            : 'Permanently delete all resolved alerts and their notifications? Active alerts stay. This cannot be undone.'
+        }
+        confirmLabel={clearScope === 'all' ? 'Clear all' : 'Clear resolved'}
+        loading={saving}
+        onClose={() => setClearScope(null)}
+        onConfirm={handleClearAlerts}
+      />
 
       <Dialog open={openAddAlert} onClose={() => !saving && setOpenAddAlert(false)} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 600 }}>Add alert</DialogTitle>
@@ -273,7 +352,15 @@ const Alerts = () => {
               }}
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, mb: 1 }}>
-                <SeverityChip severity={alert.severity} />
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <SeverityChip severity={alert.severity} />
+                  <Chip
+                    size="small"
+                    label={alert.status || 'active'}
+                    color={alert.status === 'resolved' ? 'default' : 'success'}
+                    variant="outlined"
+                  />
+                </Stack>
                 <IconButton
                   size="small"
                   aria-label="View message"
@@ -305,6 +392,7 @@ const Alerts = () => {
                 <TableRow>
                   <TableCell>Message</TableCell>
                   <TableCell>Severity</TableCell>
+                  <TableCell>Status</TableCell>
                   <TableCell>Country</TableCell>
                   <TableCell>Server</TableCell>
                   <TableCell>App</TableCell>
@@ -319,6 +407,7 @@ const Alerts = () => {
                     key={alert.id}
                     hover
                     sx={{
+                      opacity: alert.status === 'resolved' ? 0.72 : 1,
                       animation: 'listEnter 280ms ease-out',
                       '@keyframes listEnter': {
                         from: { opacity: 0, transform: 'translateY(4px)' },
@@ -329,6 +418,14 @@ const Alerts = () => {
                     <TableCell sx={{ fontWeight: 500 }}>{trimMessage(alert.message)}</TableCell>
                     <TableCell>
                       <SeverityChip severity={alert.severity} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={alert.status || 'active'}
+                        color={alert.status === 'resolved' ? 'default' : 'success'}
+                        variant="outlined"
+                      />
                     </TableCell>
                     <TableCell>{alert.country}</TableCell>
                     <TableCell>{alert.server}</TableCell>

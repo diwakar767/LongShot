@@ -15,6 +15,16 @@ const User = sequelize.define('User', {
   must_change_password: { type: DataTypes.BOOLEAN, defaultValue: false },
   totp_secret: { type: DataTypes.STRING(128), allowNull: true },
   totp_enabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+  notify_prefs: {
+    type: DataTypes.JSONB,
+    allowNull: false,
+    defaultValue: {
+      critical: true,
+      major: true,
+      minor: false,
+      trivial: false
+    }
+  },
   // Legacy email-OTP columns (unused; kept for alter-sync compatibility)
   otp_code: { type: DataTypes.STRING(6), allowNull: true },
   otp_expires_at: { type: DataTypes.DATE, allowNull: true }

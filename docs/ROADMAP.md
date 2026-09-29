@@ -50,13 +50,12 @@ LongShot is a **self-hosted, free-to-run alert reporting system**:
 | Maintainable backend (modules + migrations) | Done |
 | Mobile-first layout + animations | Done |
 | Permission-scoped alerts + access requests | Done |
+| In-app notification center | Done |
 
 ### Not done yet
 
 | Capability | State |
 |------------|--------|
-| In-app notification center | Planned (Notify sprint) |
-| Settings severity prefs | Local prefs done; notify pipeline Planned |
 | Optional mobile client | Later |
 
 ---
@@ -68,7 +67,8 @@ SecureCore (done)
   → BackendHardening (done)
   → UXMobileFirst (done)
   → Permissions+AccessRequests (done)
-  → InAppNotifications (MVP notify — free) — next
+  → InAppNotifications (done)
+  → AlarmLifecycle (CLI dedupe/resolve + retention) — done
   → MobileClient (optional; same in-app model)
 ```
 
@@ -95,7 +95,7 @@ Auth recovery without email/SMS; TOTP; session fixes.
 - Access requests (group/server) separate from password-reset requests  
 - Users UI: real group assignment  
 
-### 5) In-app notifications (free MVP notify) — Next
+### 5) In-app notifications (free MVP notify) — Done
 - On alert ingest (and key admin events), create **Notification** rows for eligible users  
 - API: list / mark-read / unread count  
 - UI: notification bell + panel (mobile-friendly)  
@@ -103,7 +103,14 @@ Auth recovery without email/SMS; TOTP; session fixes.
 - Update `notification_sent` (or replace with delivery log)  
 - **No email/SMS/FCM required**  
 
-### 6) Mobile client (optional)
+### 5b) Alarm lifecycle + retention — Done
+- Fingerprint = hash(severity + server + app + group + normalized message)  
+- CLI local state (next to CLI binary): dedupe reasserts; after `resolve_after_seconds` (N) quiet → `POST /alert/resolve`  
+- Backend alert `active` / `resolved`; UI shows status  
+- Retention days per **server** and **application** (admin onboarding / edit pages); cleanup resolved alerts  
+- **Agent heartbeat:** CLI `--agent` / `--heartbeat` every **15 minutes** (config `heartbeat_interval_seconds`); backend marks **down** after **30 minutes** without a beat; dashboard shows `agents_live/agents_total`; Servers page colors Live / Down / Unknown  
+
+### 6) Mobile client (optional) — Next if desired
 - Thin client over existing APIs  
 - **In-app notification inbox** (same backend) — not paid push  
 - Optional later enhancement: OS local notifications / FCM only if explicitly chosen  

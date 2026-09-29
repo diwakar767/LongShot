@@ -10,9 +10,17 @@ const Alert = sequelize.define('Alert', {
   group_id: { type: DataTypes.INTEGER, references: { model: UserGroup, key: 'group_id' } },
   app_id: { type: DataTypes.INTEGER, references: { model: Application, key: 'app_id' } },
   country_id: { type: DataTypes.INTEGER, references: { model: Country, key: 'country_id' } },
+  fingerprint: { type: DataTypes.STRING(64), allowNull: true },
+  status: {
+    type: DataTypes.ENUM('active', 'resolved'),
+    allowNull: false,
+    defaultValue: 'active'
+  },
+  last_seen_at: { type: DataTypes.DATE, allowNull: true },
+  resolved_at: { type: DataTypes.DATE, allowNull: true },
   notification_sent: { type: DataTypes.BOOLEAN, defaultValue: false }
 }, {
-  timestamps: true // Ensure this is true to include createdAt
+  timestamps: true
 });
 Alert.belongsTo(Country, { foreignKey: 'country_id' });
 Alert.belongsTo(Application, { foreignKey: 'app_id' });

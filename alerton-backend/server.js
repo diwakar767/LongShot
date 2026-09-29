@@ -4,6 +4,7 @@ require('dotenv').config();
 const logger = require('./utils/logger');
 const { runMigrations } = require('./migrate');
 const { createApp } = require('./app');
+const { pruneResolvedAlerts } = require('./services/retention');
 
 async function boot() {
   const secret = process.env.JWT_SECRET || process.env.SECRET_KEY;
@@ -19,6 +20,15 @@ async function boot() {
   app.listen(PORT, '0.0.0.0', () => {
     logger.info('server_listening', { port: PORT });
   });
+
+  // Periodic retention cleanup (resolved alerts)
+  const pruneHours = Number(process.env.RETENTION_PRUNE_HOURS) || 6;
+  setInterval(() => {
+    pruneResolvedAlerts().catch((err) =>
+      logger.error('retention_prune_failed', { error: err.message })
+    );
+  }, pruneHours * 60 * 60 * 1000);
+  pruneResolvedAlerts().catch(() => {});
 }
 
 boot().catch((err) => {

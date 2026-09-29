@@ -6,7 +6,9 @@ const Server = sequelize.define('Server', {
   ip_address: { type: DataTypes.STRING(15) },
   country_id: { type: DataTypes.INTEGER, references: { model: Country, key: 'country_id' } },
   app_id: { type: DataTypes.INTEGER, references: { model: Application, key: 'app_id' } },
-  is_active: { type: DataTypes.BOOLEAN, defaultValue: true }
+  is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
+  retention_days: { type: DataTypes.INTEGER, allowNull: true },
+  agent_last_heartbeat_at: { type: DataTypes.DATE, allowNull: true }
 }, {
   indexes: [{ name: 'idx_servers_app', fields: ['app_id'] }]
 });

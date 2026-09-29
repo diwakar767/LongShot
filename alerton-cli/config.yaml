@@ -1,8 +1,0 @@
-url: "http://127.0.0.1:5000/alert"
-api_key: "longshot-dev-ingest-key"
-message: "Default alert message"
-severity: "minor"
-server_name: "cli1-server"
-group_name: "techops"
-app_name: "monitor"
-country_name: "United States"
