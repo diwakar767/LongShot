@@ -44,3 +44,7 @@ backups/**
 *.zip
 *.pdf
 AlertON Application.pdf
+
+# Local portfolio gallery captures (upload manually to site)
+screenshots/
+!screenshots/.gitkeep
