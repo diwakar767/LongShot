@@ -1,368 +1,245 @@
 import React, { useState, useEffect } from 'react';
-import { login, requestOTP, verifyOTP, resetPassword } from '../services/api';
+import { login, verifyLoginTotp, submitPasswordResetRequest } from '../services/api';
 import {
   Box,
   Paper,
   Typography,
   TextField,
   Button,
-  FormControl,
   InputAdornment,
   IconButton,
   Link,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Alert
 } from '@mui/material';
-import {
-  Lock as LockIcon,
-  Person as PersonIcon,
-  Visibility,
-  VisibilityOff
-} from '@mui/icons-material';
+import { Lock as LockIcon, Person as PersonIcon, Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated } from '../utils/auth';
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({
-    username: '',
-    password: ''
-  });
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
-  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
-  const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [userId, setUserId] = useState(null);
+  const [info, setInfo] = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetUsername, setResetUsername] = useState('');
   const [modalError, setModalError] = useState('');
+  const [modalInfo, setModalInfo] = useState('');
+  const [totpOpen, setTotpOpen] = useState(false);
+  const [preAuthToken, setPreAuthToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      navigate('/');
-    }
+    if (isAuthenticated()) navigate('/');
   }, [navigate]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setCredentials(prev => ({ ...prev, [name]: value }));
+  const finishLogin = (data) => {
+    localStorage.setItem('authToken', data.token);
+    if (data.must_enroll_totp) {
+      navigate('/totp-setup');
+    } else {
+      navigate('/');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+    setInfo('');
     if (!credentials.username || !credentials.password) {
       setError('Please enter both username and password');
       return;
     }
-  
     try {
-      const { token } = await login(credentials);
-      localStorage.setItem('authToken', token);
-      navigate('/');
+      const data = await login(credentials);
+      if (data.requires_password_change) {
+        sessionStorage.setItem('changeToken', data.change_token);
+        sessionStorage.setItem('changeUsername', data.username || credentials.username);
+        navigate('/change-password');
+        return;
+      }
+      if (data.requires_totp) {
+        setPreAuthToken(data.pre_auth_token);
+        setTotpCode('');
+        setTotpOpen(true);
+        return;
+      }
+      finishLogin(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setModalError('Please enter your email');
-      return;
-    }
-
+  const handleTotpSubmit = async () => {
     try {
-      await requestOTP(email);
-      setForgotPasswordOpen(false);
-      setOtpModalOpen(true);
-      setModalError('');
+      const data = await verifyLoginTotp(preAuthToken, totpCode);
+      setTotpOpen(false);
+      finishLogin(data);
     } catch (err) {
-      setModalError(err.response?.data?.error || 'Failed to send OTP');
+      setError(err.response?.data?.error || 'Invalid authenticator code');
     }
   };
 
-  const handleVerifyOTP = async () => {
-    try {
-      const { user_id } = await verifyOTP(email, otp);
-      setModalError('');
-      setOtpModalOpen(false);
-      setResetPasswordOpen(true);
-      setUserId(user_id);
-      setOtp('');
-    } catch (err) {
-      setModalError(err.response?.data?.error || 'Invalid OTP');
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setModalError('Passwords do not match');
+  const handleResetRequest = async () => {
+    if (!resetUsername.trim()) {
+      setModalError('Enter your username');
       return;
     }
-    if (newPassword.length < 8) {
-      setModalError('Password must be at least 8 characters');
-      return;
-    }
-
     try {
-      await resetPassword(userId, newPassword);
+      const data = await submitPasswordResetRequest(resetUsername.trim());
       setModalError('');
-      setResetPasswordOpen(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      setEmail('');
-      setError('Password reset successfully. Please log in.');
+      setModalInfo(data.message);
     } catch (err) {
-      setModalError(err.response?.data?.error || 'Failed to reset password');
+      setModalError(err.response?.data?.error || 'Failed to submit request');
     }
   };
 
   return (
     <Box
       sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
         minHeight: '100vh',
-        backgroundColor: 'background.default'
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        p: 2
       }}
     >
-      <Paper
-        elevation={3}
-        sx={{
-          p: 4,
-          width: '100%',
-          maxWidth: 400,
-          borderRadius: 3
-        }}
-      >
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Box
-            sx={{
-              width: 60,
-              height: 60,
-              bgcolor: 'primary.main',
-              color: 'white',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 3,
-              mb: 2
-            }}
-          >
-            <LockIcon fontSize="large" />
-          </Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-            AlertOn
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Sign in to your account
-          </Typography>
-        </Box>
+      <Paper sx={{ p: 4, width: '100%', maxWidth: 420 }}>
+        <Typography variant="h5" gutterBottom fontWeight={600}>
+          LongShot
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Sign in to manage alerts
+        </Typography>
 
         {error && (
-          <Box 
-            sx={{ 
-              backgroundColor: 'error.light', 
-              color: 'error.main',
-              p: 2,
-              mb: 3,
-              borderRadius: 2,
-              textAlign: 'center'
-            }}
-          >
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </Box>
+          </Alert>
+        )}
+        {info && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {info}
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <TextField
-              label="Username"
-              name="username"
-              value={credentials.username}
-              onChange={handleInputChange}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <PersonIcon />
-                  </InputAdornment>
-                ),
-              }}
-              fullWidth
-            />
-          </FormControl>
-
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <TextField
-              label="Password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              value={credentials.password}
-              onChange={handleInputChange}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <LockIcon />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-              fullWidth
-            />
-          </FormControl>
-
-          <Button
-            type="submit"
-            variant="contained"
+        <Box component="form" onSubmit={handleSubmit}>
+          <TextField
             fullWidth
-            size="large"
-            sx={{
-              py: 1.5,
-              borderRadius: 3,
-              textTransform: 'none',
-              fontSize: '1rem'
+            margin="normal"
+            label="Username"
+            name="username"
+            value={credentials.username}
+            onChange={(e) => setCredentials((p) => ({ ...p, username: e.target.value }))}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PersonIcon fontSize="small" />
+                </InputAdornment>
+              )
             }}
-          >
-            Sign In
+          />
+          <TextField
+            fullWidth
+            margin="normal"
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            value={credentials.password}
+            onChange={(e) => setCredentials((p) => ({ ...p, password: e.target.value }))}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LockIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={() => setShowPassword((s) => !s)} edge="end" size="small">
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+            <Link
+              component="button"
+              type="button"
+              variant="body2"
+              onClick={() => {
+                setForgotOpen(true);
+                setModalError('');
+                setModalInfo('');
+                setResetUsername(credentials.username);
+              }}
+            >
+              Need a password reset?
+            </Link>
+          </Box>
+          <Button type="submit" fullWidth variant="contained" sx={{ mt: 3 }}>
+            Sign in
           </Button>
-        </form>
-
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Link
-            href="#"
-            variant="body2"
-            sx={{ textDecoration: 'none' }}
-            onClick={(e) => {
-              e.preventDefault();
-              setForgotPasswordOpen(true);
-            }}
-          >
-            Forgot password?
-          </Link>
         </Box>
       </Paper>
 
-      {/* Forgot Password Email Modal */}
-      <Dialog open={forgotPasswordOpen} onClose={() => setForgotPasswordOpen(false)}>
-        <DialogTitle>Forgot Password</DialogTitle>
+      <Dialog open={forgotOpen} onClose={() => setForgotOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Request password reset</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Enter your email to receive an OTP.
+            No email or SMS is used. An administrator will generate a temporary password and share
+            it with you. They can also reset your authenticator if needed.
           </Typography>
           {modalError && (
-            <Typography color="error" sx={{ mb: 2 }}>
+            <Alert severity="error" sx={{ mb: 2 }}>
               {modalError}
-            </Typography>
+            </Alert>
+          )}
+          {modalInfo && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {modalInfo}
+            </Alert>
           )}
           <TextField
-            label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
             fullWidth
-            type="email"
+            label="Username"
+            value={resetUsername}
+            onChange={(e) => setResetUsername(e.target.value)}
+            margin="dense"
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setForgotPasswordOpen(false)}>Cancel</Button>
-          <Button onClick={handleForgotPassword} variant="contained">Send OTP</Button>
+          <Button onClick={() => setForgotOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={handleResetRequest}>
+            Submit request
+          </Button>
         </DialogActions>
       </Dialog>
 
-      {/* OTP Modal */}
-      <Dialog open={otpModalOpen} onClose={() => setOtpModalOpen(false)}>
-        <DialogTitle>Enter OTP</DialogTitle>
+      <Dialog open={totpOpen} onClose={() => setTotpOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Authenticator code</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            An OTP has been sent to {email}.
+            Enter the 6-digit code from your authenticator app.
           </Typography>
-          {modalError && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {modalError}
-            </Typography>
-          )}
           <TextField
-            label="OTP"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
             fullWidth
-            inputProps={{ maxLength: 6 }}
+            label="TOTP code"
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value)}
+            inputProps={{ inputMode: 'numeric', maxLength: 6 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOtpModalOpen(false)}>Cancel</Button>
-          <Button onClick={handleVerifyOTP} variant="contained">Verify</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Reset Password Modal */}
-      <Dialog open={resetPasswordOpen} onClose={() => setResetPasswordOpen(false)}>
-        <DialogTitle>Reset Password</DialogTitle>
-        <DialogContent>
-          {modalError && (
-            <Typography color="error" sx={{ mb: 2 }}>
-              {modalError}
-            </Typography>
-          )}
-          <TextField
-            label="New Password"
-            type={showResetPassword ? 'text' : 'password'}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            fullWidth
-            sx={{ mb: 2 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    edge="end"
-                  >
-                    {showResetPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-          <TextField
-            label="Confirm Password"
-            type={showResetPassword ? 'text' : 'password'}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            fullWidth
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowResetPassword(!showResetPassword)}
-                    edge="end"
-                  >
-                    {showResetPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setResetPasswordOpen(false)}>Cancel</Button>
-          <Button onClick={handleResetPassword} variant="contained">Reset</Button>
+          <Button onClick={() => setTotpOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleTotpSubmit}>
+            Verify
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

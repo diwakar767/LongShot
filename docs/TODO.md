@@ -1,30 +1,29 @@
 ﻿# TODO Backlog
 
-Priorities: P0 blocker Â· P1 next Â· P2 later. Tags map to [SPRINTS.md](./SPRINTS.md).
+Priorities: P0 blocker · P1 next · P2 later. Tags map to [SPRINTS.md](./SPRINTS.md) / [ROADMAP.md](./ROADMAP.md).
 
 | ID | Priority | Sprint | Item | Status |
 |----|----------|--------|------|--------|
-| T-001 | P0 | Phase1 | Repo layout, `.gitignore`, `.env.example` | Done |
-| T-002 | P0 | Phase1 | Docs pack (stories, goals, architecture, sprints, status, airules) | Done |
-| T-003 | P0 | Phase1 | Docker Compose + Dockerfiles | Done |
-| T-004 | P0 | Phase1 | Env JWT/DB/CORS; ingest API key; CLI update | Done |
-| T-005 | P0 | Phase1 | pg_dump host â†’ restore Docker; verify | Done |
-| T-006 | P0 | Phase1 | Push baseline to `diwakar767/LongShot` | Done |
-| T-010 | P0 | SecureCore | OTP-bound password reset token | Todo |
-| T-011 | P0 | SecureCore | Axios instance + 401 interceptor | Todo |
-| T-012 | P1 | SecureCore | Rate-limit login / forgot-password | Todo |
+| T-001–T-006 | P0 | Phase1 | Repo, docs, Docker, env, migrate, push | Done |
+| T-010–T-015 | P0 | SecureCore | Reset request, temp password, TOTP, axios | Done |
 | T-020 | P1 | BackendHardening | Split routes/services from `server.js` | Todo |
 | T-021 | P1 | BackendHardening | Real migrations; disable alter-sync in prod | Todo |
-| T-022 | P1 | BackendHardening | Structured logging + tests for auth/ingest | Todo |
+| T-022 | P1 | BackendHardening | Structured logging + auth/ingest/reset tests | Todo |
 | T-023 | P0 | BackendHardening | Remove duplicate dead `GET /alerts` | Todo |
-| T-030 | P1 | UXPolish | Theme refine; dialogs instead of prompt/confirm | Todo |
-| T-031 | P1 | UXPolish | Finish or remove Requests/Settings stubs | Todo |
-| T-032 | P2 | UXPolish | Dead code/dep cleanup | Todo |
-| T-040 | P1 | NotifyEmail | Persist push/email severity settings | Todo |
-| T-041 | P1 | NotifyEmail | Fan-out email on ingest; `notification_sent` | Todo |
-| T-050 | P1 | RequestsPermissions | Wire permission-scoped alerts | Todo |
-| T-051 | P1 | RequestsPermissions | Subscription request API + UI | Todo |
-| T-052 | P2 | RequestsPermissions | Lock / temp-password user fields | Todo |
-| T-060 | P2 | FCM/Mobile | Firebase + mobile client | Todo |
+| T-030 | P1 | UXMobileFirst | Mobile-first responsive shell | Todo |
+| T-031 | P1 | UXMobileFirst | Dialogs/snackbars; remove prompt/confirm/alert | Todo |
+| T-032 | P1 | UXMobileFirst | Animations (nav, lists, severity emphasis) | Todo |
+| T-033 | P1 | UXMobileFirst | Dynamic UX (skeletons, empty states) | Todo |
+| T-034 | P2 | UXMobileFirst | Theme cleanup + dead code/deps | Todo |
+| T-050 | P1 | PermissionsAccess | Wire permission-scoped alerts | Todo |
+| T-051 | P1 | PermissionsAccess | Group/server access request API + UI | Todo |
+| T-052 | P2 | PermissionsAccess | Users UI: real group assignment | Todo |
+| T-040 | P1 | InAppNotifications | Notification model + list/unread/mark-read APIs | Todo |
+| T-041 | P1 | InAppNotifications | Create notifications on alert ingest | Todo |
+| T-042 | P1 | InAppNotifications | Bell + panel UI (mobile-first) | Todo |
+| T-043 | P1 | InAppNotifications | Severity prefs in Settings drive notify | Todo |
+| T-060 | P2 | MobileClient | Optional client using same APIs + in-app inbox | Todo |
 
-Update this table when work starts or finishes; keep [STATUS.md](./STATUS.md) as the narrative snapshot.
+**Dropped / superseded:** paid email notify as primary path; mandatory FCM for MVP.
+
+Update when work finishes; keep [STATUS.md](./STATUS.md) and [ROADMAP.md](./ROADMAP.md) current.

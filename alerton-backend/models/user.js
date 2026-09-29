@@ -1,25 +1,26 @@
-const { sequelize, DataTypes } = require('./country'); // Adjust to your centralized DB config
+const { sequelize, DataTypes } = require('./country');
 
 const User = sequelize.define('User', {
   user_id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   username: { type: DataTypes.STRING(50), unique: true, allowNull: false },
   password_hash: { type: DataTypes.STRING(255), allowNull: false },
-  email: { 
-    type: DataTypes.STRING(100), 
-    unique: true, 
-    allowNull: false, // Required for forgot password
+  email: {
+    type: DataTypes.STRING(100),
+    unique: true,
+    allowNull: false,
     validate: { isEmail: true }
   },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
   is_admin: { type: DataTypes.BOOLEAN, defaultValue: false },
-  otp_code: { type: DataTypes.STRING(6), allowNull: true }, // 6-digit OTP
-  otp_expires_at: { type: DataTypes.DATE, allowNull: true } // OTP expiration
+  must_change_password: { type: DataTypes.BOOLEAN, defaultValue: false },
+  totp_secret: { type: DataTypes.STRING(128), allowNull: true },
+  totp_enabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+  // Legacy email-OTP columns (unused; kept for alter-sync compatibility)
+  otp_code: { type: DataTypes.STRING(6), allowNull: true },
+  otp_expires_at: { type: DataTypes.DATE, allowNull: true }
 }, {
-  timestamps: true, // For createdAt/updatedAt
-  indexes: [
-    { fields: ['email'] }, // Optimize email lookups
-    { fields: ['otp_code'] } // Optimize OTP verification
-  ]
+  timestamps: true,
+  indexes: [{ fields: ['email'] }]
 });
 
 module.exports = { User };

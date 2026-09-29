@@ -36,7 +36,7 @@ const Sidebar = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Alerts', icon: <AlertsIcon />, path: '/alerts' },
     { text: 'Servers', icon: <ServersIcon />, path: '/servers' },
-    { text: 'Requests', icon: <RequestsIcon />, path: '/requests' },
+    { text: 'Reset requests', icon: <RequestsIcon />, path: '/requests' },
     { text: 'Groups', icon: <GroupsIcon />, path: '/groups' },
     { text: 'Users', icon: <UsersIcon />, path: '/users' },
     { text: 'Audit', icon: <AuditIcon />, path: '/audit' },

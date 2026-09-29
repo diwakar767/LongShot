@@ -11,7 +11,9 @@ const cors = require('cors');
 const { UserPermission } = require('./models/user_permission');
 const { UserGroupMembership } = require('./models/user_group_membership');
 const { AuditLog } = require('./models/audit_log');
-const { sendOTPEmail } = require('./utils/email');
+const { PasswordResetRequest } = require('./models/password_reset_request');
+const { generateTotpSecret, buildOtpauthUrl, buildQrDataUrl, verifyTotp } = require('./utils/totp');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const app = express();
@@ -34,7 +36,7 @@ const ALERT_INGEST_API_KEY = process.env.ALERT_INGEST_API_KEY || '';
 app.use(cors({
   origin: CORS_ORIGIN,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Change-Token']
 }));
 
 // Optional: Middleware to log actions (example)
@@ -228,24 +230,351 @@ app.post('/alert', authenticateAlertIngest, async (req, res) => {
   }
 });
 
-// Login endpoint
+// Login endpoint — password, then optional TOTP / forced password change
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = await User.findOne({ where: { username } });
-    if (!user || !await bcrypt.compare(password, user.password_hash)) {
+    if (!user || !user.is_active || !await bcrypt.compare(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    const token = jwt.sign({ user_id: user.user_id, is_admin: user.is_admin }, SECRET_KEY, { expiresIn: '1h' });
-    res.json({ token });
+
+    if (user.must_change_password) {
+      const changeToken = jwt.sign(
+        { user_id: user.user_id, purpose: 'change_password' },
+        SECRET_KEY,
+        { expiresIn: '15m' }
+      );
+      return res.json({
+        requires_password_change: true,
+        change_token: changeToken,
+        username: user.username
+      });
+    }
+
+    if (user.totp_enabled && user.totp_secret) {
+      const preAuthToken = jwt.sign(
+        { user_id: user.user_id, purpose: 'totp' },
+        SECRET_KEY,
+        { expiresIn: '5m' }
+      );
+      return res.json({ requires_totp: true, pre_auth_token: preAuthToken });
+    }
+
+    const token = jwt.sign(
+      { user_id: user.user_id, is_admin: user.is_admin },
+      SECRET_KEY,
+      { expiresIn: '1h' }
+    );
+    res.json({
+      token,
+      totp_enabled: !!user.totp_enabled,
+      must_enroll_totp: !user.totp_enabled
+    });
   } catch (error) {
+    console.error('Login failed:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+app.post('/login/totp', async (req, res) => {
+  const { pre_auth_token, totp_code } = req.body;
+  try {
+    if (!pre_auth_token || !totp_code) {
+      return res.status(400).json({ error: 'pre_auth_token and totp_code are required' });
+    }
+    let payload;
+    try {
+      payload = jwt.verify(pre_auth_token, SECRET_KEY);
+    } catch {
+      return res.status(403).json({ error: 'Invalid or expired pre-auth token' });
+    }
+    if (payload.purpose !== 'totp') {
+      return res.status(403).json({ error: 'Invalid token purpose' });
+    }
+    const user = await User.findByPk(payload.user_id);
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      return res.status(400).json({ error: 'TOTP is not enabled for this user' });
+    }
+    if (!verifyTotp(totp_code, user.totp_secret)) {
+      return res.status(401).json({ error: 'Invalid authenticator code' });
+    }
+    const token = jwt.sign(
+      { user_id: user.user_id, is_admin: user.is_admin },
+      SECRET_KEY,
+      { expiresIn: '1h' }
+    );
+    res.json({ token, totp_enabled: true });
+  } catch (error) {
+    console.error('TOTP login failed:', error);
+    res.status(500).json({ error: 'TOTP login failed' });
+  }
+});
+
+const authenticateChangePassword = (req, res, next) => {
+  const bearer = req.headers['authorization']?.split(' ')[1];
+  const headerToken = req.headers['x-change-token'];
+  const token = headerToken || bearer;
+  if (!token) return res.status(401).json({ error: 'No change token provided' });
+  jwt.verify(token, SECRET_KEY, (err, payload) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired change token' });
+    // Accept dedicated change_password tokens, or a normal session JWT
+    if (payload.purpose && payload.purpose !== 'change_password') {
+      return res.status(403).json({ error: 'Invalid token purpose' });
+    }
+    req.user = payload;
+    next();
+  });
+};
+
+app.post('/change-password', authenticateChangePassword, async (req, res) => {
+  const { new_password } = req.body;
+  try {
+    if (!new_password || String(new_password).length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const user = await User.findByPk(req.user.user_id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const password_hash = await bcrypt.hash(new_password, 10);
+    await user.update({ password_hash, must_change_password: false });
+
+    await AuditLog.create({
+      user_id: user.user_id,
+      action: 'password_changed',
+      details: { message: 'User set a new password after temp/reset' }
+    });
+
+    if (user.totp_enabled && user.totp_secret) {
+      const token = jwt.sign(
+        { user_id: user.user_id, is_admin: user.is_admin },
+        SECRET_KEY,
+        { expiresIn: '1h' }
+      );
+      return res.json({ message: 'Password updated', token, must_enroll_totp: false });
+    }
+
+    const token = jwt.sign(
+      { user_id: user.user_id, is_admin: user.is_admin },
+      SECRET_KEY,
+      { expiresIn: '1h' }
+    );
+    res.json({
+      message: 'Password updated',
+      token,
+      must_enroll_totp: true
+    });
+  } catch (error) {
+    console.error('Change password failed:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+function generateTempPassword() {
+  return crypto.randomBytes(9).toString('base64url').slice(0, 12);
+}
+
+// User raises a password-reset request (no email/SMS)
+app.post('/password-reset-requests', async (req, res) => {
+  const { username } = req.body;
+  try {
+    if (!username) return res.status(400).json({ error: 'Username is required' });
+    const user = await User.findOne({ where: { username } });
+    // Always return the same message to avoid account enumeration
+    const publicMessage =
+      'If this account exists, a reset request was submitted. Contact an administrator for your temporary password.';
+
+    if (!user || !user.is_active) {
+      return res.json({ message: publicMessage });
+    }
+
+    const existing = await PasswordResetRequest.findOne({
+      where: { user_id: user.user_id, status: 'pending' }
+    });
+    if (!existing) {
+      await PasswordResetRequest.create({ user_id: user.user_id, status: 'pending' });
+      await AuditLog.create({
+        user_id: user.user_id,
+        action: 'password_reset_requested',
+        details: { username: user.username }
+      });
+    }
+
+    res.json({ message: publicMessage });
+  } catch (error) {
+    console.error('Password reset request failed:', error);
+    res.status(500).json({ error: 'Failed to submit reset request' });
+  }
+});
+
+app.get('/password-reset-requests', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const rows = await PasswordResetRequest.findAll({
+      include: [
+        { model: User, as: 'user', attributes: ['user_id', 'username', 'email', 'totp_enabled'] },
+        { model: User, as: 'handler', attributes: ['user_id', 'username'], required: false }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(rows);
+  } catch (error) {
+    console.error('List password reset requests failed:', error);
+    res.status(500).json({ error: 'Failed to list reset requests' });
+  }
+});
+
+app.post('/password-reset-requests/:id/fulfill', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const request = await PasswordResetRequest.findByPk(req.params.id, {
+      include: [{ model: User, as: 'user' }]
+    });
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: 'Request is not pending' });
+    }
+
+    const resetTotp = Boolean(req.body?.reset_totp);
+    const tempPassword = generateTempPassword();
+    const password_hash = await bcrypt.hash(tempPassword, 10);
+    const updates = {
+      password_hash,
+      must_change_password: true
+    };
+    if (resetTotp) {
+      updates.totp_secret = null;
+      updates.totp_enabled = false;
+    }
+
+    await request.user.update(updates);
+    await request.update({
+      status: 'fulfilled',
+      reset_totp: resetTotp,
+      handled_by: req.user.user_id,
+      notes: req.body?.notes || null
+    });
+
+    await AuditLog.create({
+      user_id: req.user.user_id,
+      action: 'password_reset_fulfilled',
+      details: {
+        target_user_id: request.user_id,
+        reset_totp: resetTotp,
+        request_id: request.request_id
+      }
+    });
+
+    res.json({
+      message: 'Temporary password generated. Share it with the user out-of-band.',
+      temp_password: tempPassword,
+      username: request.user.username,
+      reset_totp: resetTotp
+    });
+  } catch (error) {
+    console.error('Fulfill password reset failed:', error);
+    res.status(500).json({ error: 'Failed to fulfill reset request' });
+  }
+});
+
+app.post('/password-reset-requests/:id/reject', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const request = await PasswordResetRequest.findByPk(req.params.id);
+    if (!request) return res.status(404).json({ error: 'Request not found' });
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: 'Request is not pending' });
+    }
+    await request.update({
+      status: 'rejected',
+      handled_by: req.user.user_id,
+      notes: req.body?.notes || null
+    });
+    await AuditLog.create({
+      user_id: req.user.user_id,
+      action: 'password_reset_rejected',
+      details: { request_id: request.request_id }
+    });
+    res.json({ message: 'Request rejected' });
+  } catch (error) {
+    console.error('Reject password reset failed:', error);
+    res.status(500).json({ error: 'Failed to reject reset request' });
+  }
+});
+
+app.get('/totp/setup', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.user_id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (user.must_change_password) {
+      return res.status(403).json({ error: 'Change your temporary password first' });
+    }
+
+    const secret = generateTotpSecret();
+    await user.update({ totp_secret: secret, totp_enabled: false });
+    const otpauthUrl = buildOtpauthUrl(user.username, secret);
+    const qr_data_url = await buildQrDataUrl(otpauthUrl);
+    res.json({ secret, otpauth_url: otpauthUrl, qr_data_url });
+  } catch (error) {
+    console.error('TOTP setup failed:', error);
+    res.status(500).json({ error: 'Failed to start TOTP setup' });
+  }
+});
+
+app.post('/totp/enable', authenticateToken, async (req, res) => {
+  try {
+    const { totp_code } = req.body;
+    const user = await User.findByPk(req.user.user_id);
+    if (!user || !user.totp_secret) {
+      return res.status(400).json({ error: 'Call /totp/setup first' });
+    }
+    if (!verifyTotp(totp_code, user.totp_secret)) {
+      return res.status(401).json({ error: 'Invalid authenticator code' });
+    }
+    await user.update({ totp_enabled: true });
+    await AuditLog.create({
+      user_id: user.user_id,
+      action: 'totp_enabled',
+      details: {}
+    });
+    res.json({ message: 'Authenticator enabled', totp_enabled: true });
+  } catch (error) {
+    console.error('TOTP enable failed:', error);
+    res.status(500).json({ error: 'Failed to enable TOTP' });
+  }
+});
+
+// Legacy email OTP endpoints retired (no email/SMS in Secure Core)
+app.post('/forgot-password', (req, res) => {
+  res.status(410).json({
+    error: 'Email OTP is disabled. Submit a password reset request and contact an administrator.'
+  });
+});
+app.post('/verify-otp', (req, res) => {
+  res.status(410).json({ error: 'Email OTP is disabled.' });
+});
+app.post('/reset-password', (req, res) => {
+  res.status(410).json({
+    error: 'Self-serve email reset is disabled. Use an admin-issued temporary password.'
+  });
+});
+
+app.get('/dashboard/summary', authenticateToken, async (req, res) => {
+  try {
+    const [alertCount, serverCount, userCount] = await Promise.all([
+      Alert.count(),
+      Server.count({ where: { is_active: true } }),
+      User.count({ where: { is_active: true } })
+    ]);
+    res.json({ alerts: alertCount, servers: serverCount, users: userCount });
+  } catch (error) {
+    console.error('Failed to fetch dashboard summary:', error);
+    res.status(500).json({ error: 'Failed to fetch summary' });
   }
 });
 
 // User endpoints
 app.get('/users', authenticateToken, async (req, res) => {
-  const users = await User.findAll({ attributes: { exclude: ['password_hash'] } });
+  const users = await User.findAll({
+    attributes: { exclude: ['password_hash', 'totp_secret', 'otp_code'] }
+  });
   res.json(users);
 });
 
@@ -575,103 +904,6 @@ app.delete('/applications/:id', authenticateToken, requireAdmin, auditMiddleware
   } catch (error) {
     console.error('Failed to delete application:', error);
     res.status(500).json({ error: 'Failed to delete application' });
-  }
-});
-
-// Generate and send OTP
-app.post('/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  try {
-    const user = await User.findOne({ where: { email } });
-    if (!user) {
-      return res.status(404).json({ error: 'Email not found' });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    await user.update({
-      otp_code: otp,
-      otp_expires_at: expiresAt
-    });
-
-    await sendOTPEmail(email, otp);
-
-    res.json({ message: 'OTP sent to your email' });
-  } catch (error) {
-    console.error('Failed to send OTP:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
-});
-
-// Verify OTP
-app.post('/verify-otp', async (req, res) => {
-  const { email, otp } = req.body;
-  try {
-    if (!email || !otp) {
-      return res.status(400).json({ error: 'Email and OTP are required' });
-    }
-
-    const user = await User.findOne({
-      where: {
-        email,
-        otp_code: otp,
-        otp_expires_at: { [Op.gt]: new Date() } // Use imported Op
-      }
-    });
-
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
-    }
-
-    await user.update({
-      otp_code: null,
-      otp_expires_at: null
-    });
-
-    res.json({ message: 'OTP verified', user_id: user.user_id });
-  } catch (error) {
-    console.error('Failed to verify OTP:', error);
-    res.status(500).json({ error: 'Failed to verify OTP' });
-  }
-});
-
-// Reset password
-app.post('/reset-password', async (req, res) => {
-  const { user_id, new_password } = req.body;
-  try {
-    const user = await User.findByPk(user_id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const password_hash = await bcrypt.hash(new_password, 10);
-    await user.update({ password_hash });
-
-    await AuditLog.create({
-      user_id: user.user_id,
-      action: 'password_reset',
-      details: { message: 'User reset their password' }
-    });
-
-    res.json({ message: 'Password reset successfully' });
-  } catch (error) {
-    console.error('Failed to reset password:', error);
-    res.status(500).json({ error: 'Failed to reset password' });
-  }
-});
-
-app.get('/dashboard/summary', authenticateToken, async (req, res) => {
-  try {
-    const [alertCount, serverCount, userCount] = await Promise.all([
-      Alert.count(),
-      Server.count({ where: { is_active: true } }),
-      User.count({ where: { is_active: true } })
-    ]);
-    res.json({ alerts: alertCount, servers: serverCount, users: userCount });
-  } catch (error) {
-    console.error('Failed to fetch dashboard summary:', error);
-    res.status(500).json({ error: 'Failed to fetch summary' });
   }
 });
 

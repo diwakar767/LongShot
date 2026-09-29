@@ -3,6 +3,8 @@ import { CssBaseline } from '@mui/material';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 //import { alertonTheme } from './theme';
 import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
+import TotpSetup from './pages/TotpSetup';
 import Dashboard from './pages/Dashboard';
 import Alerts from './pages/Alerts';
 // import Alerts from './pages/Alerts_new';
@@ -30,6 +32,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/change-password" element={<ChangePassword />} />
+          <Route path="/totp-setup" element={<TotpSetup />} />
           <Route path="*" element={
             <PrivateRoute>
               <Box sx={{ display: 'flex', minHeight: '100vh' }}>

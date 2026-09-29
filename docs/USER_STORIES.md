@@ -29,7 +29,7 @@ Source: product PDF vision + current codebase (Phase 1 baseline).
 | US-A5 | As an admin, I can create users with a temporary password | Generator in UI; no first-login forced change | **Partial** |
 | US-A6 | As an admin, I can lock/unlock accounts | UI placeholders; no backend fields | **Planned** |
 | US-A7 | As an admin, I can assign users to groups and set view permissions | Membership/permission APIs exist; UI incomplete; alert scoping broken | **Partial** |
-| US-A8 | As an admin, I can configure which severities trigger notifications | Settings UI stub; no persistence | **Planned** |
+| US-A8 | As an admin/user, I can configure which severities create **in-app** notifications | Settings prefs + notify pipeline | **Planned** |
 | US-A9 | As an admin, I can approve or reject subscription requests | Requests page mock only | **Planned** |
 
 ---
@@ -40,8 +40,9 @@ Source: product PDF vision + current codebase (Phase 1 baseline).
 |----|-------|------------|--------|
 | US-U1 | As a user, I can log in and change a temporary password | Login works; OTP reset exists; temp-password flow incomplete | **Partial** |
 | US-U2 | As a user, I see only alerts for my approved groups/permissions | Permission-filtered `GET /alerts` unreachable | **Planned** |
-| US-U3 | As a user, I can manage notification preferences by severity | Settings stub | **Planned** |
-| US-U4 | As a user, I receive push/email for critical alerts | `notification_sent` unused; no FCM | **Planned** |
+| US-U3 | As a user, I can manage which severities create in-app notifications | Settings stub → InAppNotifications sprint | **Planned** |
+| US-U4 | As a user, I see new alerts in an **in-app** notification inbox (bell/unread) | Free path; same API for optional mobile later | **Planned** |
+| US-U4b | As a user, I use a mobile-friendly, animated web UI | UXMobileFirst sprint | **Planned** |
 | US-U5 | As a user, I can request group subscriptions pending admin approval | Not implemented | **Planned** |
 | US-U6 | As a user, I can use a mobile app offline with sync | React Native not started | **Planned** |
 

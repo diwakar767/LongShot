@@ -1,5 +1,5 @@
-import React from 'react';
-import { 
+import React, { useEffect, useState } from 'react';
+import {
   Box,
   Paper,
   Table,
@@ -10,117 +10,210 @@ import {
   TableRow,
   Typography,
   Button,
-  TextField,
-  InputAdornment,
-  Pagination
+  Chip,
+  FormControlLabel,
+  Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Stack
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
+import {
+  getPasswordResetRequests,
+  fulfillPasswordResetRequest,
+  rejectPasswordResetRequest,
+  checkAdmin
+} from '../services/api';
 
 const Requests = () => {
-  const requestsData = [
-    { id: 1, username: 'vuen_ao', server: '10.53.25.111', country: 'UG', app: 'USSD' },
-    { id: 2, username: 'wrej_ao', server: '172.27.2.4', country: 'NG', app: 'MoMo' },
-    { id: 3, username: 'grok_ao', server: '10.53.25.87', country: 'UG', app: 'Rewards' },
-    { id: 4, username: 'kill_ao', server: '10.230.32.151', country: 'GH', app: 'MyMTN' },
-    { id: 5, username: 'modl_au', server: '172.27.8.12', country: 'RW', app: 'Blue Marble' },
-    { id: 6, username: 'poet_ao', server: '172.27.2.5', country: 'NG', app: 'MoMo' },
-    { id: 7, username: 'trump_ao', server: '10.53.25.87', country: 'UG', app: 'Rewards' },
-  ];
+  const [rows, setRows] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState('');
+  const [fulfillTarget, setFulfillTarget] = useState(null);
+  const [resetTotp, setResetTotp] = useState(true);
+  const [tempPassword, setTempPassword] = useState('');
+  const [info, setInfo] = useState('');
+
+  const load = async () => {
+    try {
+      const data = await getPasswordResetRequests();
+      setRows(data);
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load requests (admin only)');
+      setRows([]);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await checkAdmin();
+        setIsAdmin(true);
+        await load();
+      } catch {
+        setIsAdmin(false);
+        setError('Administrator access is required to manage password reset requests.');
+      }
+    })();
+  }, []);
+
+  const handleFulfill = async () => {
+    if (!fulfillTarget) return;
+    try {
+      const result = await fulfillPasswordResetRequest(fulfillTarget.request_id, {
+        reset_totp: resetTotp
+      });
+      setTempPassword(result.temp_password);
+      setInfo(
+        `Temporary password for ${result.username}. Share it out-of-band (chat/call). It will not be shown again.`
+      );
+      setFulfillTarget(null);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to fulfill request');
+    }
+  };
+
+  const handleReject = async (id) => {
+    try {
+      await rejectPasswordResetRequest(id);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reject request');
+    }
+  };
+
+  const copyTemp = async () => {
+    if (!tempPassword) return;
+    await navigator.clipboard.writeText(tempPassword);
+  };
 
   return (
     <Box>
       <Typography variant="h1" gutterBottom>
-        Requests
+        Password reset requests
       </Typography>
-      
-      {/* Search and Filters */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          size="small"
-          placeholder="Search requests..."
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ width: 300 }}
-        />
-      </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Users request a reset in the app. Admins generate a temporary password and optionally reset
+        TOTP — no email or SMS.
+      </Typography>
 
-      {/* Requests Table */}
-      <Paper sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: 'background.default' }}>
-                {/* <TableCell sx={{ fontWeight: 600 }}>S.No.</TableCell> */}
-                <TableCell sx={{ fontWeight: 600 }}>Username</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Server</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Country</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>App</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {requestsData.map((request) => (
-                <TableRow key={request.id} hover>
-                  {/* <TableCell>{request.id}</TableCell> */}
-                  <TableCell sx={{ fontWeight: 500 }}>{request.username}</TableCell>
-                  <TableCell>{request.server}</TableCell>
-                  <TableCell>{request.country}</TableCell>
-                  <TableCell>{request.app}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<CheckCircleIcon />}
-                        sx={{
-                          textTransform: 'none',
-                          borderRadius: 3,
-                          px: 2,
-                          backgroundColor: 'success.main',
-                          '&:hover': {
-                            backgroundColor: 'success.dark',
-                          }
-                        }}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<CancelIcon />}
-                        sx={{
-                          textTransform: 'none',
-                          borderRadius: 3,
-                          px: 2,
-                          color: 'error.main',
-                          borderColor: 'error.main',
-                          '&:hover': {
-                            borderColor: 'error.main',
-                          }
-                        }}
-                      >
-                        Reject
-                      </Button>
-                    </Box>
-                  </TableCell>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {info && (
+        <Alert
+          severity="success"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={copyTemp}>
+              Copy password
+            </Button>
+          }
+        >
+          {info}
+          {tempPassword ? (
+            <Typography component="div" sx={{ mt: 1, fontFamily: 'monospace' }}>
+              {tempPassword}
+            </Typography>
+          ) : null}
+        </Alert>
+      )}
+
+      {!isAdmin ? null : (
+        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: 'background.default' }}>
+                  <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>TOTP</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Requested</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+              </TableHead>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>No password reset requests.</TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((row) => (
+                    <TableRow key={row.request_id} hover>
+                      <TableCell>{row.user?.username}</TableCell>
+                      <TableCell>{row.user?.email}</TableCell>
+                      <TableCell>
+                        {row.user?.totp_enabled ? (
+                          <Chip size="small" label="Enabled" color="success" />
+                        ) : (
+                          <Chip size="small" label="Off" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={row.status} />
+                      </TableCell>
+                      <TableCell>
+                        {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+                      </TableCell>
+                      <TableCell>
+                        {row.status === 'pending' ? (
+                          <Stack direction="row" spacing={1}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => {
+                                setFulfillTarget(row);
+                                setResetTotp(true);
+                                setTempPassword('');
+                                setInfo('');
+                              }}
+                            >
+                              Issue temp password
+                            </Button>
+                            <Button size="small" color="inherit" onClick={() => handleReject(row.request_id)}>
+                              Reject
+                            </Button>
+                          </Stack>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      )}
 
-      {/* Pagination */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-        <Pagination count={5} shape="rounded" />
-      </Box>
+      <Dialog open={Boolean(fulfillTarget)} onClose={() => setFulfillTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Issue temporary password</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            User: <strong>{fulfillTarget?.user?.username}</strong>
+          </Typography>
+          <FormControlLabel
+            control={
+              <Checkbox checked={resetTotp} onChange={(e) => setResetTotp(e.target.checked)} />
+            }
+            label="Reset TOTP so they enroll a fresh authenticator after login"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFulfillTarget(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handleFulfill}>
+            Generate
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

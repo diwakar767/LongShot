@@ -4,13 +4,16 @@ These rules apply to humans and coding agents working in this repository.
 
 ## Product posture
 - Prefer small, reversible changes over rewrites.
-- Do not invent features that are not in `docs/USER_STORIES.md` / `docs/SPRINTS.md` without updating those docs first.
-- Phase scope is sacred: if the active sprint is foundations, do not “just add” FCM or a visual redesign.
+- Do not invent features that are not in `docs/USER_STORIES.md` / `docs/SPRINTS.md` / `docs/ROADMAP.md` without updating those docs first.
+- Phase scope is sacred: stay on the current sprint.
+- Notifications are **in-app** (free). Do not add paid SMS/email/FCM as the primary path.
+- Optional mobile later must reuse the same in-app notification APIs.
 
 ## Design / UX
 - Do **not** produce generic AI UI: no purple-glow gradients, no emoji decoration, no card-soup dashboards for their own sake.
 - Keep the existing MUI foundation unless a sprint explicitly calls for theme work.
-- Prefer boring, readable admin UI. Match patterns already in `alerton-frontend/src/pages`.
+- **Mobile-first** layouts; purposeful animations and dynamic loading/empty states when in the UX sprint.
+- Prefer readable admin/user UI. Match patterns already in `alerton-frontend/src/pages`.
 
 ## Security
 - Never commit `.env`, `credentials.txt`, dumps, or real API keys/passwords.

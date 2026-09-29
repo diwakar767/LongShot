@@ -21,19 +21,21 @@ LongShot (AlertOn) is a centralized alert reporting system: engineers ingest ale
 ## FG-4 Authentication and account recovery
 - Username/password login issuing short-lived JWT.
 - Admin vs non-admin capabilities.
-- Forgot-password via emailed OTP and password reset (to be hardened).
+- Password reset via **in-app request** + admin **temporary password** (no email/SMS).
+- Optional **TOTP** (authenticator app) for login.
 
 ## FG-5 Auditability
 - Record admin/mutating actions in an audit log.
 - Admins can search and review recent actions.
 
-## FG-6 Notifications (target)
-- Persist notification settings by severity.
-- Fan out email to eligible group members when an alert arrives (near-term).
-- Optional FCM push for mobile (later).
-- Track delivery via `notification_sent` (or successor fields).
+## FG-6 Notifications (in-app, free)
+- Persist severity preferences for which alerts notify.
+- On ingest, create **in-app notifications** for eligible users.
+- Users can list, see unread count, and mark notifications read (web; same API for optional mobile later).
+- Track delivery state (`notification_sent` or notification rows).
+- **No email/SMS/paid push required** for MVP.
 
-## FG-7 Subscription requests (target)
+## FG-7 Subscription / access requests (target)
 - Users request access to groups/servers.
 - Admins approve or reject; membership/permissions update accordingly.
 
@@ -41,3 +43,8 @@ LongShot (AlertOn) is a centralized alert reporting system: engineers ingest ale
 - Health endpoint for API/database.
 - Docker-based local/runtime stack.
 - Documented backup and restore of PostgreSQL.
+
+## FG-9 Experience (UX)
+- **Mobile-first** responsive web UI.
+- Dynamic feedback (loading, empty, errors).
+- Purposeful animations (not decorative noise).

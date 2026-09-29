@@ -1,67 +1,45 @@
 ﻿# Project Status
 
 **Last updated:** 2026-09-29  
-**Phase:** Phase 1 â€” Docs, Docker, Foundations (**complete**)  
-**Remote:** https://github.com/diwakar767/LongShot.git (private)
+**Active sprint next:** Backend Hardening  
+**Remote:** https://github.com/diwakar767/LongShot.git  
+**Canonical plan:** [ROADMAP.md](./ROADMAP.md) · [SPRINTS.md](./SPRINTS.md)
 
-## What works now
+## Running
 
-- Backend Express API with Sequelize models and JWT UI auth
-- CLI alert ingest with required `X-API-Key`
-- Admin web UI: dashboard, alerts, servers, groups, users, applications, audit
-- Docker Compose stack: `postgres`, `backend`, `frontend`
-- Env-based configuration (`.env.example`)
-- Host Postgres dumped and restored into Docker Postgres (`localhost:5433`)
-
-## What does not work / stubs
-
-- Requests page (mock)
-- Settings page (no persistence / no notify)
-- Permission-scoped alert listing (duplicate route)
-- Push / FCM / mobile
-- HTTPS, rate limits, production migrations
-
-## Local runtime
-
-| Component | Endpoint |
-|-----------|----------|
+| Service | URL |
+|---------|-----|
 | UI | http://localhost:3000 |
-| API | http://localhost:5000 |
-| Health | http://localhost:5000/health |
-| Postgres (Docker) | localhost:5433 |
+| API | http://localhost:5000/health |
+| Postgres | localhost:5433 |
 
-**Lab login (restored DB):** `admin` / `admin123`  
-**CLI API key:** `ALERT_INGEST_API_KEY` / `alerton-cli/config.yaml` `api_key`
+Lab admin: `admin` / `admin123`
 
-Start: `docker compose up --build`
+## Completed
 
-## Restored row counts (pre-probe)
+- Phase 1 (Docker, env, API-key ingest, docs, DB migrate)  
+- Secure Core (reset requests, temp password, TOTP, logout-on-401-only)  
+- E2E **31/31 PASS**
 
-| Entity | Count |
-|--------|------:|
-| Users | 4 |
-| Servers | 5 |
-| Alerts | 5 (7 after Phase 1 ingest probes) |
-| Countries | 4 |
-| Applications | 4 |
-| UserGroups | 3 |
-| AuditLogs | 44 |
+## Locked product decisions (see ROADMAP)
 
-### Verification log
+- Notifications = **in-app** (free); same model for optional mobile later  
+- UI = **mobile-first**, dynamic, with purposeful animations  
+- No email/SMS for auth; no paid push required for MVP  
 
-| Check | Result | When |
-|-------|--------|------|
-| Host `pg_dump` | OK (~314KB) | 2026-09-29 |
-| Docker postgres healthy | OK | 2026-09-29 |
-| `pg_restore` | OK (exit 0) | 2026-09-29 |
-| Row count match | OK | 2026-09-29 |
-| `GET /health` | OK `{status:ok,database:up}` | 2026-09-29 |
-| Login + dashboard | OK (admin / summary) | 2026-09-29 |
-| Ingest without API key | OK 401 | 2026-09-29 |
-| Ingest with API key / CLI | OK Alert received | 2026-09-29 |
-| Frontend http://localhost:3000 | OK 200 | 2026-09-29 |
-| Push to LongShot | OK | 2026-09-29 |
+## Sequence remaining
 
-## Blockers
+1. **Backend Hardening**  
+2. **UX Mobile-first + animations**  
+3. **Permissions + access requests**  
+4. **In-app notifications**  
+5. **Mobile client** (optional)  
 
-None for Phase 1.
+## Still not done
+
+- Backend modularization / migrations  
+- Mobile-first layout + motion  
+- Permission-scoped alerts  
+- Access-request workflow  
+- In-app notification center  
+- Optional mobile client  

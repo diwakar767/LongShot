@@ -1,114 +1,87 @@
 # Sprint Plan — Path to End Goal
 
-Methodology: short Agile sprints. Phase 1 is complete when docs, Docker, DB migration, and security foundations land on `main`.
+Canonical decisions: **[ROADMAP.md](./ROADMAP.md)**.
 
 ```text
-Phase1 → SecureCore → BackendHardening → UXPolish → NotifyEmail → RequestsPermissions → FCM/Mobile(optional)
+SecureCore (done)
+  → BackendHardening          (next)
+  → UXMobileFirst             (mobile-first + animations + dynamic UX)
+  → PermissionsAccess         (scoped alerts + access requests)
+  → InAppNotifications        (free notify MVP)
+  → MobileClient              (optional; same in-app model)
 ```
 
 ---
 
-## Phase 1 — Docs, Docker, Foundations (current)
-
-**Goal:** Product home on LongShot; reproducible local stack; secrets out of code; authenticated ingest.
-
-**Deliverables:**
-- Documentation pack (`USER_STORIES`, goals, `ARCHITECTURE`, this file, `TODO`, `STATUS`, `AIRULES`)
-- Docker Compose (postgres, backend, frontend)
-- Host Postgres dump → Docker restore
-- Env-based `DATABASE_URL`, `JWT_SECRET`, CORS, API URL
-- `X-API-Key` on `POST /alert` + CLI support
-- `.gitignore` / scrub credentials
-
-**Exit criteria:** `docker compose up` works; migrated data visible; CLI with key succeeds; without key fails.
+## Phase 1 — Docs, Docker, Foundations — Done
 
 ---
 
-## Sprint Secure Core
+## Sprint Secure Core — Done
 
-**Goal:** Close obvious auth/session holes without a rewrite.
-
-- Bound password-reset to verified OTP (one-time reset token)
-- Frontend axios instance + 401 → logout
-- Confirm JWT expiry handling; never hardcode secrets
-- Rate-limit login / forgot-password (light)
-- Document HTTPS termination for any shared deploy
-
-**Stories:** US-U1 harden, US-S1
+- No email/SMS auth; admin temp password + optional TOTP reset  
+- Must-change-password; TOTP enroll/login  
+- Change-token Bearer fix; 401-only logout interceptor  
 
 ---
 
-## Sprint Backend Hardening
+## Sprint Backend Hardening — Next
 
-**Goal:** Maintainable backend and safer schema evolution.
+- Split `server.js` into routes/services  
+- Real migrations; stop prod `alter: true`  
+- Remove duplicate dead `GET /alerts`  
+- Tests: login, ingest API key, reset fulfill, change-password  
 
-- Split `server.js` into routes/controllers/services
-- Replace `sync({ alter: true })` with Sequelize migrations (or SQL migrations)
-- Structured logging (request id, level)
-- Expand `/health`; add readiness if useful
-- Smoke/unit tests for login + ingest auth
-- Remove dead duplicate `GET /alerts` handler as prep for permissions
-
-**Stories:** NF-2, NF-3, NF-6
+**Why before UX:** clean APIs/schema make notification + permission work safer.
 
 ---
 
-## Sprint UX Polish (measured)
+## Sprint UX — Mobile-first + dynamic + animations
 
-**Goal:** Human, restrained UI — not a redesign for its own sake.
+**Goal:** Web app feels modern and usable on phones first; desktop remains solid.
 
-- Refine existing MUI theme (avoid generic AI purple/glow tropes)
-- Replace `window.prompt` / `confirm` / raw `alert` with dialogs/snackbars
-- Decide: implement or remove Requests/Settings stubs (no fake buttons)
-- Delete unused components/deps (`StatCard`, `AlertTable`, unused packages)
-- Client pagination note → plan server pagination if lists grow
-
-**Stories:** US-A3, NF-4
-
----
-
-## Sprint Notify (Email)
-
-**Goal:** Deliver on the product promise of “someone gets notified.”
-
-- Persist severity notification settings (replace Settings stub)
-- On ingest, resolve group members / eligible users and send email
-- Set `notification_sent` (or delivery log table)
-- Admin audit for notify failures
-
-**Stories:** US-A8, US-U3, US-U4 (email path), FG-6
+- Mobile-first responsive shell (nav, tables → stacked cards/lists)  
+- Dialogs/snackbars instead of `prompt`/`confirm`/`alert`  
+- Consistent motion: page/list transitions, severity pulse/highlight, drawer  
+- Dynamic UX: loading skeletons, empty states, clear pending actions  
+- Restrained theme (no AI-slop)  
+- Dead code cleanup; Settings trimmed for upcoming in-app prefs  
 
 ---
 
-## Sprint Requests + Permissions
+## Sprint Permissions + Access Requests
 
-**Goal:** Scoped visibility and subscription workflow.
-
-- Fix alert listing to honor `UserPermission` / memberships
-- Requests API + real UI for approve/reject
-- Wire user group assignment in Users UI
-- Lock/temp-password fields if still required by stories
-
-**Stories:** US-A7, US-A9, US-U2, US-U5, FG-3, FG-7
+- Wire permission/membership filtering on alerts  
+- Group/server **access requests** (separate from password-reset Requests)  
+- Admin approve/reject; Users UI group assignment  
 
 ---
 
-## Sprint FCM / Mobile (optional)
+## Sprint In-App Notifications (free)
 
-**Goal:** Push + mobile only after email notify + permissions work.
+**Goal:** Users learn about new alerts without email/SMS/paid push.
 
-- Firebase admin on backend; device token registration
-- React Native or Expo client for login, alert list, prefs
-- Offline cache only if still justified
+- Notification entity + APIs (list, unread count, mark read)  
+- Create notifications on ingest for eligible users (respect severity prefs)  
+- Bell + panel UI (mobile-first)  
+- Settings severity toggles drive what notifies  
+- Same contract later used by optional mobile client  
 
-**Stories:** US-U4 (push), US-U6
+**Explicitly out:** Twilio, mandatory FCM, paid transactional email.
+
+---
+
+## Sprint Mobile Client — Optional
+
+- Thin app over existing REST + in-app notification inbox  
+- No dependency on paid push for MVP mobile  
+- Optional OS notifications only if later approved  
 
 ---
 
 ## Definition of Done (all sprints)
 
-- Docs/`STATUS.md` updated
-- No secrets committed
-- Works via Docker Compose
-- Backward-compatible CLI flags where possible
-- Reviewable PR / commit message explaining *why*
+- Docs/`STATUS.md`/`ROADMAP.md` updated  
+- Docker Compose works  
+- No secrets committed  
+- Decisions match ROADMAP  
