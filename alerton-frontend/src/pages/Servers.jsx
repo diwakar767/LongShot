@@ -2,13 +2,18 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, Button, TextField, InputAdornment, Pagination, Dialog, DialogTitle,
-  DialogContent, DialogActions, MenuItem, Skeleton, Stack, Chip, useMediaQuery, useTheme
+  DialogContent, DialogActions, DialogContentText, MenuItem, Skeleton, Stack, Chip,
+  useMediaQuery, useTheme
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { getServers, createServer, updateServer, deleteServer, getCountries, checkAdmin } from '../services/api';
+import KeyIcon from '@mui/icons-material/Key';
+import {
+  getServers, createServer, updateServer, deleteServer, getCountries, checkAdmin,
+  getServerIngestKey, rotateServerIngestKey
+} from '../services/api';
 import { useFeedback } from '../context/FeedbackContext';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
@@ -29,6 +34,7 @@ const Servers = () => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [keyDialog, setKeyDialog] = useState(null); // { name, ingest_api_key }
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
@@ -119,16 +125,55 @@ const Servers = () => {
       if (editing) {
         await updateServer(editing.id, payload);
         notifySuccess('Server updated');
+        setDialogOpen(false);
       } else {
-        await createServer(payload);
-        notifySuccess('Server created');
+        const created = await createServer(payload);
+        notifySuccess('Server created — copy the agent API key');
+        setDialogOpen(false);
+        if (created.ingest_api_key) {
+          setKeyDialog({ name: created.name, ingest_api_key: created.ingest_api_key });
+        }
       }
-      setDialogOpen(false);
       await fetchServers();
     } catch (error) {
       notifyError(error.response?.data?.error || 'Failed to save server');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleShowKey = async (server) => {
+    setSaving(true);
+    try {
+      const data = await getServerIngestKey(server.id);
+      setKeyDialog({ name: data.name, ingest_api_key: data.ingest_api_key });
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to load ingest key');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRotateKey = async (server) => {
+    setSaving(true);
+    try {
+      const data = await rotateServerIngestKey(server.id);
+      setKeyDialog({ name: data.name, ingest_api_key: data.ingest_api_key });
+      notifySuccess('Agent API key rotated — update CLI config on that host');
+    } catch (error) {
+      notifyError(error.response?.data?.error || 'Failed to rotate ingest key');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyKey = async () => {
+    if (!keyDialog?.ingest_api_key) return;
+    try {
+      await navigator.clipboard.writeText(keyDialog.ingest_api_key);
+      notifySuccess('API key copied');
+    } catch {
+      notifyError('Could not copy — select and copy manually');
     }
   };
 
@@ -153,6 +198,12 @@ const Servers = () => {
   const actions = (server) =>
     isAdmin && (
       <Stack direction="row" spacing={1} flexWrap="wrap">
+        <Button size="small" variant="outlined" startIcon={<KeyIcon />} onClick={() => handleShowKey(server)}>
+          Agent key
+        </Button>
+        <Button size="small" variant="outlined" onClick={() => handleRotateKey(server)}>
+          Rotate key
+        </Button>
         <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={() => openEdit(server)}>
           Edit
         </Button>
@@ -253,6 +304,28 @@ const Servers = () => {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
+
+      <Dialog open={!!keyDialog} onClose={() => setKeyDialog(null)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 600 }}>Agent API key — {keyDialog?.name}</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Put this key in the CLI <code>config.yaml</code> as <code>api_key</code> on that host only.
+            Each server has its own key.
+          </DialogContentText>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            value={keyDialog?.ingest_api_key || ''}
+            InputProps={{ readOnly: true }}
+            size="small"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setKeyDialog(null)}>Close</Button>
+          <Button variant="contained" onClick={copyKey}>Copy</Button>
+        </DialogActions>
+      </Dialog>
 
       {loading ? (
         <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} height={56} />)}</Stack>

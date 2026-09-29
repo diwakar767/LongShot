@@ -6,6 +6,7 @@ require('./setupEnv');
 
 const { createApp } = require('../app');
 const { runMigrations } = require('../migrate');
+const { adminLogin, ensureIngestFixture } = require('./helpers');
 
 describe('admin clear alerts', () => {
   let app;
@@ -14,14 +15,11 @@ describe('admin clear alerts', () => {
 
   before(async () => {
     assert.ok(process.env.JWT_SECRET || process.env.SECRET_KEY, 'JWT_SECRET required');
-    apiKey = process.env.ALERT_INGEST_API_KEY || '';
     await runMigrations();
     app = createApp();
-
-    const login = await request(app).post('/login').send({ username: 'admin', password: 'admin123' });
-    assert.equal(login.status, 200);
-    assert.ok(login.body.token);
-    token = login.body.token;
+    token = await adminLogin(app);
+    const fixture = await ensureIngestFixture(app, token);
+    apiKey = fixture.apiKey;
   });
 
   it('rejects clear for unauthenticated callers', async () => {
@@ -30,8 +28,6 @@ describe('admin clear alerts', () => {
   });
 
   it('admin can clear resolved alerts', async () => {
-    assert.ok(apiKey, 'ALERT_INGEST_API_KEY must be set');
-
     const message = `clear-resolved-${Date.now()}`;
     const open = await request(app)
       .post('/alert')
@@ -39,7 +35,6 @@ describe('admin clear alerts', () => {
       .send({
         message,
         severity: 'trivial',
-        server_name: 'cli1-server',
         group_name: 'techops',
         app_name: 'monitor',
         country_name: 'United States'

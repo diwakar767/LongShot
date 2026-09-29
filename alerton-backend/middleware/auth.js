@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
+const { Server } = require('../models/server');
 const logger = require('../utils/logger');
 
 const SECRET_KEY = process.env.JWT_SECRET || process.env.SECRET_KEY;
-const ALERT_INGEST_API_KEY = process.env.ALERT_INGEST_API_KEY || '';
 
 function getSecretKey() {
   return process.env.JWT_SECRET || process.env.SECRET_KEY || SECRET_KEY;
@@ -26,27 +26,43 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-/** CLI uses X-API-Key; admin UI may use Bearer JWT. */
-const authenticateAlertIngest = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  const ingestKey = process.env.ALERT_INGEST_API_KEY || ALERT_INGEST_API_KEY;
-  if (ingestKey && apiKey && apiKey === ingestKey) {
-    return next();
-  }
-
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) {
-    logger.warn('ingest_auth_missing');
-    return res.status(401).json({ error: 'Missing X-API-Key or Bearer token' });
-  }
-  jwt.verify(token, getSecretKey(), (err, user) => {
-    if (err) {
-      logger.warn('ingest_jwt_invalid');
-      return res.status(403).json({ error: 'Invalid token' });
+/**
+ * CLI agents authenticate with a per-server X-API-Key.
+ * Admin UI may use Bearer JWT (no ingestServer bound).
+ */
+const authenticateAlertIngest = async (req, res, next) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey) {
+      const server = await Server.findOne({ where: { ingest_api_key: apiKey } });
+      if (server) {
+        if (server.is_active === false) {
+          return res.status(403).json({ error: 'Server agent is inactive' });
+        }
+        req.ingestServer = server;
+        return next();
+      }
+      logger.warn('ingest_api_key_unknown');
+      return res.status(401).json({ error: 'Invalid X-API-Key' });
     }
-    req.user = user;
-    next();
-  });
+
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) {
+      logger.warn('ingest_auth_missing');
+      return res.status(401).json({ error: 'Missing X-API-Key or Bearer token' });
+    }
+    jwt.verify(token, getSecretKey(), (err, user) => {
+      if (err) {
+        logger.warn('ingest_jwt_invalid');
+        return res.status(403).json({ error: 'Invalid token' });
+      }
+      req.user = user;
+      next();
+    });
+  } catch (error) {
+    logger.error('ingest_auth_error', { error: error.message });
+    res.status(500).json({ error: 'Authentication failed' });
+  }
 };
 
 const authenticateChangePassword = (req, res, next) => {

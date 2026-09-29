@@ -175,8 +175,33 @@ export const deleteServer = async (serverId) => {
   return response.data;
 };
 
+export const getServerIngestKey = async (serverId) => {
+  const response = await api.get(`/servers/${serverId}/ingest-key`);
+  return response.data;
+};
+
+export const rotateServerIngestKey = async (serverId) => {
+  const response = await api.post(`/servers/${serverId}/rotate-ingest-key`);
+  return response.data;
+};
+
 export const getCountries = async () => {
   const response = await api.get('/countries');
+  return response.data;
+};
+
+export const createCountry = async (data) => {
+  const response = await api.post('/countries', data);
+  return response.data;
+};
+
+export const updateCountry = async (id, data) => {
+  const response = await api.put(`/countries/${id}`, data);
+  return response.data;
+};
+
+export const deleteCountry = async (id) => {
+  const response = await api.delete(`/countries/${id}`);
   return response.data;
 };
 

@@ -6,21 +6,20 @@ require('./setupEnv');
 
 const { createApp } = require('../app');
 const { runMigrations } = require('../migrate');
+const { adminLogin, ensureIngestFixture } = require('./helpers');
 
 describe('in-app notifications', () => {
   let app;
   let adminToken;
-  const apiKey = process.env.ALERT_INGEST_API_KEY || '';
+  let apiKey;
 
   before(async () => {
     assert.ok(process.env.JWT_SECRET || process.env.SECRET_KEY, 'JWT_SECRET required');
     await runMigrations();
     app = createApp();
-
-    const login = await request(app).post('/login').send({ username: 'admin', password: 'admin123' });
-    assert.equal(login.status, 200);
-    assert.ok(login.body.token);
-    adminToken = login.body.token;
+    adminToken = await adminLogin(app);
+    const fixture = await ensureIngestFixture(app, adminToken);
+    apiKey = fixture.apiKey;
   });
 
   it('loads and updates notification prefs', async () => {
@@ -39,7 +38,7 @@ describe('in-app notifications', () => {
   });
 
   it('creates notification on critical ingest for admin', async () => {
-    assert.ok(apiKey, 'ALERT_INGEST_API_KEY required');
+    assert.ok(apiKey, 'server ingest key required');
 
     await request(app)
       .put('/notification-prefs')
@@ -53,7 +52,6 @@ describe('in-app notifications', () => {
       .send({
         message,
         severity: 'critical',
-        server_name: 'cli1-server',
         group_name: 'techops',
         app_name: 'monitor',
         country_name: 'United States'

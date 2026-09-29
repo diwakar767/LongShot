@@ -26,9 +26,10 @@ dist/
 coverage/
 .cache/
 
-# IDE / OS
+# IDE / OS / local AI tooling (not part of the product)
 .idea/
 .vscode/
+.cursor/
 *.swp
 .DS_Store
 Thumbs.db

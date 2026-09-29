@@ -7,6 +7,7 @@ import PageFade from './PageFade';
 import Dashboard from '../pages/Dashboard';
 import Alerts from '../pages/Alerts';
 import Servers from '../pages/Servers';
+import Countries from '../pages/Countries';
 import Requests from '../pages/Requests';
 import AccessRequests from '../pages/AccessRequests';
 import Groups from '../pages/Groups';
@@ -43,6 +44,7 @@ export default function AppShell() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/servers" element={<Servers />} />
+              <Route path="/countries" element={<Countries />} />
               <Route path="/requests" element={<Requests />} />
               <Route path="/access" element={<AccessRequests />} />
               <Route path="/groups" element={<Groups />} />

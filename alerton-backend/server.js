@@ -5,6 +5,7 @@ const logger = require('./utils/logger');
 const { runMigrations } = require('./migrate');
 const { createApp } = require('./app');
 const { pruneResolvedAlerts } = require('./services/retention');
+const { bootstrapAdmin } = require('./services/bootstrap');
 
 async function boot() {
   const secret = process.env.JWT_SECRET || process.env.SECRET_KEY;
@@ -14,6 +15,7 @@ async function boot() {
   }
 
   await runMigrations();
+  await bootstrapAdmin();
 
   const app = createApp();
   const PORT = Number(process.env.PORT) || 5000;

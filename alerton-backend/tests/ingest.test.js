@@ -6,6 +6,7 @@ require('./setupEnv');
 
 const { createApp } = require('../app');
 const { runMigrations } = require('../migrate');
+const { adminLogin, ensureIngestFixture } = require('./helpers');
 
 describe('alert ingest', () => {
   let app;
@@ -13,9 +14,11 @@ describe('alert ingest', () => {
 
   before(async () => {
     assert.ok(process.env.JWT_SECRET || process.env.SECRET_KEY, 'JWT_SECRET required');
-    apiKey = process.env.ALERT_INGEST_API_KEY || '';
     await runMigrations();
     app = createApp();
+    const token = await adminLogin(app);
+    const fixture = await ensureIngestFixture(app, token);
+    apiKey = fixture.apiKey;
   });
 
   it('rejects ingest without auth', async () => {
@@ -25,15 +28,14 @@ describe('alert ingest', () => {
     assert.equal(res.status, 401);
   });
 
-  it('accepts ingest with X-API-Key when configured', async () => {
-    assert.ok(apiKey, 'ALERT_INGEST_API_KEY must be set for this test');
+  it('accepts ingest with per-server X-API-Key', async () => {
+    assert.ok(apiKey, 'server ingest key required');
     const res = await request(app)
       .post('/alert')
       .set('X-API-Key', apiKey)
       .send({
         message: `hardening-test-${Date.now()}`,
         severity: 'trivial',
-        server_name: 'cli1-server',
         group_name: 'techops',
         app_name: 'monitor',
         country_name: 'United States'

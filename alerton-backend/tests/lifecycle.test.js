@@ -7,29 +7,34 @@ require('./setupEnv');
 const { createApp } = require('../app');
 const { runMigrations } = require('../migrate');
 const { buildFingerprint } = require('../services/fingerprint');
+const { adminLogin, ensureIngestFixture } = require('./helpers');
 
 describe('alarm lifecycle', () => {
   let app;
   let apiKey;
+  let serverName;
 
   before(async () => {
     assert.ok(process.env.JWT_SECRET || process.env.SECRET_KEY, 'JWT_SECRET required');
-    apiKey = process.env.ALERT_INGEST_API_KEY || '';
     await runMigrations();
     app = createApp();
+    const token = await adminLogin(app);
+    const fixture = await ensureIngestFixture(app, token);
+    apiKey = fixture.apiKey;
+    serverName = fixture.serverName;
   });
 
   it('opens, reasserts, then resolves by fingerprint', async () => {
-    assert.ok(apiKey, 'ALERT_INGEST_API_KEY must be set for this test');
+    assert.ok(apiKey, 'server ingest key required');
     const payload = {
       message: `lifecycle-${Date.now()}`,
       severity: 'minor',
-      server_name: 'cli1-server',
+      server_name: serverName,
       group_name: 'techops',
       app_name: 'monitor',
       country_name: 'United States'
     };
-    const fingerprint = buildFingerprint(payload);
+    const fingerprint = buildFingerprint({ ...payload, server_name: serverName });
 
     const open = await request(app)
       .post('/alert')

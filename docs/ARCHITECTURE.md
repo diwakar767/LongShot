@@ -2,76 +2,54 @@
 
 ## Context
 
-LongShot (product name in GitHub) implements the AlertOn alert reporting system:
+LongShot implements AlertOn:
 
-- **Engineers** send alerts via CLI.
-- **Admins / operators** manage inventory and view alerts in a web UI.
-- **Users** (future) receive scoped notifications.
+- **Engineers** run Node CLI agents (per-server API key).
+- **Admins** manage inventory and view everything in the web UI.
+- **Users** see scoped alerts and in-app notifications.
 
 ```text
-[CLI agents] --X-API-Key--> [Backend API] <---JWT--- [Web UI]
-                                 |
-                                 v
-                           [PostgreSQL]
+[CLI agents] --X-API-Key (per server)--> [Backend API] <---JWT--- [Web UI]
+                                              |
+                                              v
+                                        [PostgreSQL]
+                                         volume: longshot_pgdata
 ```
 
 ## Containers (Docker Compose)
 
-| Service | Image / build | Host port | Role |
-|---------|---------------|-----------|------|
-| `postgres` | `postgres:15-alpine` | `5433→5432` | Primary data store |
-| `backend` | `./alerton-backend` | `5000` | Express + Sequelize API |
-| `frontend` | `./alerton-frontend` | `3000` | CRA admin UI |
+| Service | Build / image | Host port | Persistence |
+|---------|---------------|-----------|-------------|
+| `postgres` | `postgres:15-alpine` | `5433→5432` | Named volume `longshot_pgdata` |
+| `backend` | `./alerton-backend` | `5000` | Stateless (DB holds data) |
+| `frontend` | `./alerton-frontend` | `3000` | Stateless |
 
-CLI runs on the host (not containerized by default).
+CLI runs on agent hosts (Node 18+); not containerized by default.
 
-## Current application structure
+## Application structure
 
 ```text
-alerton-backend/     Express monolith (server.js) + Sequelize models/
-alerton-frontend/    React CRA + MUI pages
-alerton-cli/         Commander + axios ingest client
-docs/                Product & engineering documentation
-docker-compose.yml   Local stack
+alerton-backend/   app.js + routes/ + middleware/ + services/ + migrations/
+alerton-frontend/  React CRA + MUI
+alerton-cli/       Commander agent (alert, resolve, heartbeat, --agent)
+docs/              Deploy + role guides
 ```
 
-### Backend pattern
-Fat controller in `server.js`, thin Sequelize models, OTP email util. Schema currently via `sequelize.sync({ alter: true })` (to be replaced by migrations).
+### Boot sequence
+1. Umzug migrations  
+2. `bootstrapAdmin()` if no admin exists (`must_change_password: true`)  
+3. Listen; periodic retention prune  
 
-### Auth model
-- UI: JWT (`Authorization: Bearer`), secret from `JWT_SECRET`.
-- Ingest: `X-API-Key` matching `ALERT_INGEST_API_KEY`, or Bearer JWT for admin UI create-alert.
+### Auth
+- UI: JWT (`JWT_SECRET`)
+- Ingest / resolve / heartbeat: **per-server** `ingest_api_key` via `X-API-Key`, or admin JWT for UI-created alerts
+- Password change: short-lived change token; TOTP optional (Skip allowed)
 
-### Core entities
-Users, UserGroups, UserGroupMemberships, UserPermissions, Countries, Applications, Servers, Alerts, AuditLogs.
+### Retention
+`app.retention_days` → `server.retention_days` → `ALERT_RETENTION_DAYS` (default 30)
 
-Alert severity enum: `trivial | minor | major | critical`.
-
-## Target architecture (incremental)
-
-1. Env/config + Docker + authenticated ingest (**Phase 1 — done**).
-2. Secure core (reset-password, axios interceptors, CORS/API URL hygiene).
-3. Backend modularization + SQL migrations + logging/tests.
-4. Measured UX polish.
-5. Email notification pipeline using groups + settings.
-6. Subscription requests + permission-scoped alert queries.
-7. Optional FCM / mobile.
-
-## API surface (summary)
-
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/health` | none |
-| POST | `/login` | none |
-| POST | `/alert` | API key or JWT |
-| GET | `/alerts` | JWT |
-| CRUD | `/users`, `/groups`, `/servers`, `/applications` | JWT (+ admin for mutations) |
-| GET | `/countries`, `/audit`, `/dashboard/summary`, `/check-admin`, `/current-user` | JWT |
-| POST | `/forgot-password`, `/verify-otp`, `/reset-password` | none (to harden) |
-
-## Data migration
-
-Host PostgreSQL (legacy VirtualBox/lab) → Docker volume via `pg_dump` / `pg_restore`. See `docs/STATUS.md` and README runbook.
+### Agent liveness
+CLI heartbeat every `heartbeat_interval_seconds` (default 900). Server **Down** after 2× interval without a beat.
 
 ## Explicit non-goals (near term)
-Microservices, Kubernetes, multi-region, or full React Native until notification + permission foundations exist.
+Microservices, Kubernetes, paid SMS/email/FCM as primary notify, mandatory per-host mTLS.

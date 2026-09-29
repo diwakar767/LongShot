@@ -1,80 +1,72 @@
 # LongShot (AlertOn)
 
-Private monorepo for the AlertOn alert reporting system: CLI ingest, Express API, React admin UI, PostgreSQL.
+Private monorepo: CLI agents, Express API, React admin UI, PostgreSQL.
 
-## Quick start (Docker)
+## Prerequisites
 
-1. Copy env file and adjust secrets:
+| Requirement | Notes |
+|-------------|--------|
+| **Docker Desktop** + Compose v2 | Primary path for API + UI + Postgres |
+| **Node.js 18+** | Required on every **agent host** that runs the CLI (Docker optional there) |
+| Free ports | `3000` (UI), `5000` (API), `5433` (Postgres host map) |
+
+## Quick start (admin server)
 
 ```bash
 cp .env.example .env
-```
-
-2. Start the stack:
-
-```bash
+# Set JWT_SECRET, POSTGRES_PASSWORD, and optional BOOTSTRAP_ADMIN_* values
 docker compose up --build
 ```
 
-- UI: http://localhost:3000  
-- API: http://localhost:5000/health  
-- Postgres: `localhost:5433` (mapped from container `5432`)
+| Service | URL |
+|---------|-----|
+| UI | http://localhost:3000 |
+| API health | http://localhost:5000/health |
+| Postgres | `localhost:5433` (named volume `longshot_pgdata` — data persists across restarts) |
 
-3. Log in with a user from your database (lab default after restore: `admin` / `admin123`).
+### First login
 
-## Migrate data from host PostgreSQL
+1. Sign in as bootstrap admin (defaults: `admin` / `ChangeMeNow!`, overridable via env).
+2. You **must** set a new password.
+3. Authenticator (TOTP) setup opens next — use **Skip for now** if you prefer optional TOTP later (Settings).
+4. As admin, create inventory before agents can report:
+   - **Countries** → **Applications** → **Groups** → **Servers** → **Users**
+5. When you create a **Server**, copy its unique **agent API key** into that host’s CLI `config.yaml`.
 
-If you already have a Windows/host Postgres `alerton` database on port 5432:
-
-```bash
-# From repo root (Git Bash / PowerShell with pg tools on PATH)
-pg_dump -h localhost -U alerton -d alerton -F c -f backups/alerton_host.dump
-
-docker compose up -d postgres
-# wait until healthy, then:
-pg_restore -h localhost -p 5433 -U alerton -d alerton --clean --if-exists backups/alerton_host.dump
-```
-
-Then start backend/frontend (`docker compose up --build`) and confirm data in the UI.
-
-## CLI
+## CLI agent (any host with Node)
 
 ```bash
 cd alerton-cli
-# Copy config.example.yaml → config.yaml (or config.local.yaml) and set api_key
-# to the same value as ALERT_INGEST_API_KEY in root .env
+cp config.example.yaml config.yaml
+# Set url, server_name (must match UI), and api_key from Servers → Agent key
+npm install   # if needed
 node cli.js --message "Disk full" --severity major
-node cli.js --dry-run
+node cli.js --agent                 # long-lived heartbeat + resolve flush
 ```
 
-Without a valid `X-API-Key`, `POST /alert` returns 401.
+See [docs/GUIDE_ENGINEER.md](docs/GUIDE_ENGINEER.md) for Windows service / always-on setup.
+
+## Documentation
+
+| Doc | Audience |
+|-----|----------|
+| [Deploy & persistence](docs/DEPLOY.md) | Operators standing up the stack |
+| [Admin guide](docs/GUIDE_ADMIN.md) | Admins / operators |
+| [Engineer / CLI guide](docs/GUIDE_ENGINEER.md) | Agent hosts |
+| [User guide](docs/GUIDE_USER.md) | Regular web users |
+| [Architecture](docs/ARCHITECTURE.md) | How the system fits together |
 
 ## Packages
 
 | Path | Role |
 |------|------|
 | `alerton-backend` | Express + Sequelize API |
-| `alerton-frontend` | CRA + MUI admin UI |
-| `alerton-cli` | Alert submission client |
-| `docs/` | Stories, goals, architecture, sprints, status |
+| `alerton-frontend` | CRA + MUI web UI |
+| `alerton-cli` | Alert + heartbeat agent (Node only) |
+| `docs/` | Deploy and role guides |
 
-## Documentation
+## Auth model (short)
 
-- [User stories](docs/USER_STORIES.md)
-- [Functional goals](docs/FUNCTIONAL_GOALS.md)
-- [Non-functional goals](docs/NON_FUNCTIONAL_GOALS.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Sprint plan](docs/SPRINTS.md)
-- [TODO](docs/TODO.md)
-- [Status](docs/STATUS.md)
-- [AI / agent rules](docs/AIRULES.md)
-
-## Local backend without Docker (optional)
-
-```bash
-# Point DATABASE_URL at Docker postgres or host postgres
-cd alerton-backend && npm install && npm start
-cd alerton-frontend && npm install && npm start
-```
-
-Ensure root `.env` defines `JWT_SECRET` and `ALERT_INGEST_API_KEY`.
+- **Web UI:** JWT after login.
+- **CLI / agents:** per-**server** `X-API-Key` (unique key generated when the server is created; reveal/rotate in Admin → Servers).
+- Global shared ingest key is **not** used.

@@ -111,16 +111,27 @@ router.post('/alert', authenticateAlertIngest, async (req, res) => {
     let { message, severity, server_name, group_name, app_name, country_name } = req.body;
     message = message || 'Default alert message';
     severity = severity || 'minor';
-    server_name = server_name || 'cli1-server';
     group_name = group_name || 'techops';
     app_name = app_name || 'monitor';
     country_name = country_name || 'United States';
+
+    // Per-server API key binds the agent to that server (cannot spoof another name)
+    if (req.ingestServer) {
+      server_name = req.ingestServer.server_name;
+    } else {
+      server_name = server_name || null;
+      if (!server_name) {
+        return res.status(400).json({ error: 'server_name is required' });
+      }
+    }
 
     if (!['trivial', 'minor', 'major', 'critical'].includes(severity)) {
       throw new Error('Invalid severity level. Use trivial, minor, major, or critical.');
     }
 
-    const server_id = await getServerIdByName(server_name);
+    const server_id = req.ingestServer
+      ? req.ingestServer.server_id
+      : await getServerIdByName(server_name);
     const app_id = await getAppIdByName(app_name);
     const country_id = await getCountryIdByName(country_name);
     const group_id = await getGroupIdByName(group_name);
@@ -193,10 +204,13 @@ router.post('/alert', authenticateAlertIngest, async (req, res) => {
 router.post('/alert/resolve', authenticateAlertIngest, async (req, res) => {
   try {
     let { fingerprint, message, severity, server_name, group_name, app_name } = req.body;
+    if (req.ingestServer) {
+      server_name = req.ingestServer.server_name;
+    }
     if (!fingerprint) {
       fingerprint = buildFingerprint({
         severity: severity || 'minor',
-        server_name: server_name || 'cli1-server',
+        server_name: server_name || 'unknown',
         app_name: app_name || 'monitor',
         group_name: group_name || 'techops',
         message: message || ''
